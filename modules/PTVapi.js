@@ -28,15 +28,13 @@ function compareStops(a, b) {
 
 // To check if the connection to the API is working
 module.exports = {
-    healthCheck: function() {
+    healthCheck: async function() {
         const timestamp = moment.utc().format();
         const request = '/v2/healthcheck?timestamp=' + timestamp + '&devid=' + devID;
         const signature = encryptSignature(request);
-        let result;
-        axios.get(baseURL + request + '&signature=' + signature)
+        const result = await axios.get(baseURL + request + '&signature=' + signature)
             .then(response => {
-                console.log(response);
-                result = response;
+                return response;
             })
             .catch(error => {
                 console.log(error);

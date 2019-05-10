@@ -15,12 +15,14 @@ var app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
-app.setup = async function () {
-  const interval = 3000;
-    setInterval(async () => {
-      console.log("HI");
-    }, interval);
+var recursive = async function() {
+  const data = await API.healthCheck()
+  app.locals.data = data;
+
+  // console.log(app.locals.data);
 }
+
+setInterval(recursive, 3000);
 
 app.use(logger('dev'));
 app.use(express.json());
