@@ -26,9 +26,23 @@ function compareStops(a, b) {
     return comparison;
 }
 
+async function getDeparturesForStop(route_id, stop_id) {
+    const request = '/v3/departures/route_type/0/stop/' + stop_id + '/route/' + route_id + '?look_backwards=false&max_results=1&devid=' + devID;
+    const signature = encryptSignature(request);
+
+    const departures = await axios.get(baseURL + request + '&signature=' + signature)
+        .then(response => {
+            return response.data.departures;
+        })
+        .catch(error => {
+            console.log(error);
+        })
+    return departures;
+}
+
 // To check if the connection to the API is working
 module.exports = {
-    healthCheck: async function() {
+    healthCheck: async function () {
         const timestamp = moment.utc().format();
         const request = '/v2/healthcheck?timestamp=' + timestamp + '&devid=' + devID;
         const signature = encryptSignature(request);
@@ -38,22 +52,38 @@ module.exports = {
             })
             .catch(error => {
                 console.log(error);
-            }) 
+            })
         return result;
     },
-    getStops: async function(route_id) {
-    const request = '/v3/stops/route/' + route_id + '/route_type/0?direction_id=1&devid=' + devID;
-    const signature = encryptSignature(request);
+    getStops: async function (route_id) {
+        const request = '/v3/stops/route/' + route_id + '/route_type/0?direction_id=1&devid=' + devID;
+        const signature = encryptSignature(request);
 
-    const stops = await axios.get(baseURL + request + '&signature=' + signature)
-        .then(response => {
-            const stops = response.data.stops.sort(compareStops);
-            return stops;
-        })
-        .catch(error => {
-            console.log(error);
-        })
-    return stops;        
+        const stops = await axios.get(baseURL + request + '&signature=' + signature)
+            .then(response => {
+                const stops = response.data.stops.sort(compareStops);
+                return stops;
+            })
+            .catch(error => {
+                console.log(error);
+            })
+        return stops;
+    },
+    getDeparturesForRoute: async function (route_id, stops) {
+        let departures = [];
+        for (let i in stops) {
+            const stop_id = stops[i].stop_id;
+
+            departures.push(await getDeparturesForStop(route_id, stop_id)
+                .then(response => {
+                    return response;
+                })
+                .catch(error => {
+                    console.log(error);
+                })
+            )
+        }
+        return departures;
     }
 }
 
