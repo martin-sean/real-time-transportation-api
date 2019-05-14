@@ -11,22 +11,29 @@ router.get('/', asyncHandler(async (req, res, next) => {
   // const response = API.healthCheck();
   // const stops = await API.getStops(3);
 
-  if(req.app.locals.data) {
+  if (req.app.locals.data) {
     res.json(req.app.locals.data);
   }
 
 }));
 
 router.get('/train', asyncHandler(async (req, res, next) => {
-  if(req.app.locals.data) {
+  if (req.app.locals.data) {
     res.json(req.app.locals.data);
   }
 
 }));
 
 router.get('/stops', asyncHandler(async (req, res, next) => {
-  if(req.app.locals.stops) {
+  if (req.app.locals.stops) {
     res.json(req.app.locals.stops);
+  }
+
+}));
+
+router.get('/departures', asyncHandler(async (req, res, next) => {
+  if (req.app.locals.departures) {
+    res.json(req.app.locals.departures);
   }
 
 }));

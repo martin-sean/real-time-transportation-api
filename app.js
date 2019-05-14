@@ -6,6 +6,7 @@ var logger = require('morgan');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
+var debugRouter = require('./routes/debug');
 
 var API = require('./modules/PTVapi');
 var Stations = require('./modules/stations');
@@ -77,6 +78,7 @@ var initiate = async function () {
               stops = stops.sort(sortStations);
 
               app.locals.stops = stops;
+              app.locals.departures = departures;
 
               for (let k in departures) {
                 runs = Departures.getUniqueRuns(departures[k], routes[k]);
@@ -125,6 +127,7 @@ var recursive = async function () {
           let runsBetweenStations = [];
           departures = departures.sort(sortDepartures);
           stops = app.locals.stops;
+          app.locals.departures = departures;
 
           for (let k in departures) {
             runs = Departures.getUniqueRuns(departures[k], routes[k]);
@@ -167,6 +170,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/api', indexRouter);
 app.use('/users', usersRouter);
+app.use('/debug', debugRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
