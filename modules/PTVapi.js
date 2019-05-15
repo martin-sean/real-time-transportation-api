@@ -3,8 +3,8 @@ const crypto = require('crypto');
 const moment = require('moment');
 
 const baseURL = 'https://timetableapi.ptv.vic.gov.au';
-const apiKey = 'b4ba8648-d112-4cf5-891d-8533756cef97';
-const devID = '3001097';
+const apiKey = process.env.API_KEY;
+const devID = process.env.DEV_ID;
 
 
 // Generate signature for the API request

@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
@@ -14,7 +16,8 @@ var Departures = require('./modules/departures');
 
 var app = express();
 
-const routes = [1, 3, 15, 14];
+// const routes = [1, 2, 3, 4, 5, 6, 7, 8, 15, 14];
+const routes = [3];
 
 var sortStations = function (a, b) {
   const aRouteID = a[0].route_id;
@@ -56,13 +59,20 @@ app.set('view engine', 'pug');
 var initiate = async function () {
   let departures = [];
   let stops = [];
+  let index;
   for (let i in routes) {
     const route_id = routes[i];
     API.getStops(route_id)
       .then(result => {
         const routeStops = result;
         for (let j in routeStops) {
+          if (routeStops[j].stop_id === 1070) {
+            index = j;
+          }
           routeStops[j].route_id = route_id;
+        }
+        if (index) {
+          routeStops.splice(index, 1);
         }
         stops.push(routeStops);
 
@@ -70,10 +80,9 @@ var initiate = async function () {
           .then(response => {
             departures.push(response);
             if (departures.length === routes.length) {
-              let runs;
+              let uniqueRuns;
               let filteredRuns;
-              let runsAtStation = [];
-              let runsBetweenStations = [];
+              let runs = [];
               departures = departures.sort(sortDepartures);
               stops = stops.sort(sortStations);
 
@@ -81,26 +90,18 @@ var initiate = async function () {
               app.locals.departures = departures;
 
               for (let k in departures) {
-                runs = Departures.getUniqueRuns(departures[k], routes[k]);
-                filteredRuns = Departures.getDeparturesForRuns(runs, departures[k]);
+                uniqueRuns = Departures.getUniqueRuns(departures[k], routes[k]);
+                filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
 
                 for (let l in filteredRuns) {
-                  if (filteredRuns[l].departures[0].at_platform) {
-                    runsAtStation.push({
-                      departure: filteredRuns[l].departures[0],
-                      coordinates: Stations.getStopCoordinate(stops[k], filteredRuns[l].departures[0].stop_id)
-                    });
-                  } else {
-                    runsBetweenStations.push({
-                      departure: filteredRuns[l].departures[0],
-                      coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-                    });
-                  }
+                  runs.push({
+                    departure: filteredRuns[l].departures[0],
+                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l])
+                  });
                 }
               }
               const data = {
-                runsAtStation: runsAtStation,
-                runsBetweenStations: runsBetweenStations
+                runs: runs
               }
               app.locals.data = data;
               console.log("Done");
@@ -114,47 +115,40 @@ var initiate = async function () {
 }
 
 var recursive = async function () {
-  let departures = [];
-  for (let i in routes) {
-    const route_id = routes[i];
-    API.getDeparturesForRoute(route_id, app.locals.stops[i])
-      .then(response => {
-        departures.push(response);
-        if (departures.length === routes.length) {
-          let runs;
-          let filteredRuns;
-          let runsAtStation = [];
-          let runsBetweenStations = [];
-          departures = departures.sort(sortDepartures);
-          stops = app.locals.stops;
-          app.locals.departures = departures;
+  if (app.locals.stops) {
+    let departures = [];
+    for (let i in routes) {
+      const route_id = routes[i];
+      API.getDeparturesForRoute(route_id, app.locals.stops[i])
+        .then(response => {
+          departures.push(response);
+          if (departures.length === routes.length) {
+            let uniqueRuns;
+            let filteredRuns;
+            let runs = [];
+            departures = departures.sort(sortDepartures);
+            stops = app.locals.stops;
+            app.locals.departures = departures;
 
-          for (let k in departures) {
-            runs = Departures.getUniqueRuns(departures[k], routes[k]);
-            filteredRuns = Departures.getDeparturesForRuns(runs, departures[k]);
+            for (let k in departures) {
+              uniqueRuns = Departures.getUniqueRuns(departures[k], routes[k]);
+              filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
 
-            for (let l in filteredRuns) {
-              if (filteredRuns[l].departures[0].at_platform) {
-                runsAtStation.push({
+              for (let l in filteredRuns) {
+                runs.push({
                   departure: filteredRuns[l].departures[0],
-                  coordinates: Stations.getStopCoordinate(stops[k], filteredRuns[l].departures[0].stop_id)
-                });
-              } else {
-                runsBetweenStations.push({
-                  departure: filteredRuns[l].departures[0],
-                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
+                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l])
                 });
               }
             }
+            const data = {
+              runs: runs
+            }
+            console.log(data);
+            app.locals.data = data;
           }
-          const data = {
-            runsAtStation: runsAtStation,
-            runsBetweenStations: runsBetweenStations
-          }
-          app.locals.data = data;
-          console.log(data);
-        }
-      })
+        })
+    }
   }
 }
 
@@ -187,10 +181,5 @@ app.use(function (err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
-
-const port = process.env.PORT || 5000;
-app.listen(port);
-
-console.log('App is listening on port ' + port);
 
 module.exports = app;
