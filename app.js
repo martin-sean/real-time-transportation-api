@@ -7,8 +7,6 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 
 var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var debugRouter = require('./routes/debug');
 
 var API = require('./modules/PTVapi');
 var Stations = require('./modules/stations');
@@ -16,7 +14,6 @@ var Departures = require('./modules/departures');
 
 var app = express();
 
-// const routes = [1, 2, 3, 4, 5, 6, 7, 8, 15, 14];
 const routes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17];
 
 var sortStations = function (a, b) {
@@ -94,13 +91,8 @@ var initiate = async function () {
                 filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
                 for (let l in filteredRuns) {
                   runs.push({
-<<<<<<< HEAD
-                    departure: filteredRuns[l].departures[0],
-                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-=======
                     departure: filteredRuns[l].departures,
-                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l])
->>>>>>> 0e5fc11ca0558136234ed5e9604d01b47e529b22
+                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
                   });
                 }
               }
@@ -108,10 +100,7 @@ var initiate = async function () {
                 runs: runs
               }
               app.locals.data = data;
-              console.log("Done");
-              // console.log(app.locals.stops);
-              // console.log(runsAtStation);
-              // console.log(runsBetweenStations);
+              console.log("Initialized...");
             }
           })
       })
@@ -121,6 +110,7 @@ var initiate = async function () {
 var recursive = async function () {
   if (app.locals.stops) {
     let departures = [];
+    stops = app.locals.stops;
     for (let i in routes) {
       const route_id = routes[i];
       API.getDeparturesForRoute(route_id, app.locals.stops[i])
@@ -131,7 +121,6 @@ var recursive = async function () {
             let filteredRuns;
             let runs = [];
             departures = departures.sort(sortDepartures);
-            stops = app.locals.stops;
             app.locals.departures = departures;
 
             for (let k in departures) {
@@ -140,20 +129,15 @@ var recursive = async function () {
 
               for (let l in filteredRuns) {
                 runs.push({
-<<<<<<< HEAD
-                  departure: filteredRuns[l].departures[0],
-                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-=======
                   departure: filteredRuns[l].departures,
-                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l])
->>>>>>> 0e5fc11ca0558136234ed5e9604d01b47e529b22
+                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
                 });
               }
             }
             const data = {
               runs: runs
             }
-            console.log(data);
+            console.log("Updated...");
             app.locals.data = data;
           }
         })
@@ -172,8 +156,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/api', indexRouter);
-app.use('/users', usersRouter);
-app.use('/debug', debugRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
