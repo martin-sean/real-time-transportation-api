@@ -17,7 +17,7 @@ var Departures = require('./modules/departures');
 var app = express();
 
 // const routes = [1, 2, 3, 4, 5, 6, 7, 8, 15, 14];
-const routes = [3];
+const routes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17];
 
 var sortStations = function (a, b) {
   const aRouteID = a[0].route_id;
@@ -94,8 +94,13 @@ var initiate = async function () {
                 filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
                 for (let l in filteredRuns) {
                   runs.push({
+<<<<<<< HEAD
                     departure: filteredRuns[l].departures[0],
                     coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
+=======
+                    departure: filteredRuns[l].departures,
+                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l])
+>>>>>>> 0e5fc11ca0558136234ed5e9604d01b47e529b22
                   });
                 }
               }
@@ -135,8 +140,13 @@ var recursive = async function () {
 
               for (let l in filteredRuns) {
                 runs.push({
+<<<<<<< HEAD
                   departure: filteredRuns[l].departures[0],
                   coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
+=======
+                  departure: filteredRuns[l].departures,
+                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l])
+>>>>>>> 0e5fc11ca0558136234ed5e9604d01b47e529b22
                 });
               }
             }
