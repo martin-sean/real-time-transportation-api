@@ -92,11 +92,10 @@ var initiate = async function () {
               for (let k in departures) {
                 uniqueRuns = Departures.getUniqueRuns(departures[k], routes[k]);
                 filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
-
                 for (let l in filteredRuns) {
                   runs.push({
                     departure: filteredRuns[l].departures[0],
-                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l])
+                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
                   });
                 }
               }
@@ -137,7 +136,7 @@ var recursive = async function () {
               for (let l in filteredRuns) {
                 runs.push({
                   departure: filteredRuns[l].departures[0],
-                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l])
+                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
                 });
               }
             }

@@ -1,35 +1,16 @@
 module.exports = {
     // Get coordinates of the stops that the train is currently in between
-    getCoordinatesPair: function (stops, stop_id, filteredDepartures) {
-        const lastStopID = stops[stops.length - 1].stop_id;
+    getCoordinatesPair: function (stops, stop_id, direction_id) {
 
         let stopsArray;
         let nextStopCoordinates;
         let previousStopCoordinates;
 
-        let nextStopID = filteredDepartures.departures[0].stop_id;
-        let nextNextStopID = filteredDepartures.departures[1].stop_id;
-
         // Scenario when next stop is not the last stop
-
-        if (nextNextStopID) {
-            for (let i in stops) {
-                if (stops[i].stop_id === nextStopID) {
-                    if (i < stops.length - 1) {
-                        if (stops[parseInt(i) + 1].stop_id === nextNextStopID) {
-                            stopsArray = stops;
-                        }
-                    } else {
-                        stopsArray = stops.slice().reverse();
-                    }
-                }
-            }
-        } else {
-            if (nextStopID = lastStopID) {
-                stopsArray = stops;
-            } else {
-                stopsArray = stops.slice().reverse();
-            }
+        if (direction_id === 1) {   // all direction_id 1 goes to City (Flinders Street)
+            stopsArray = stops
+        } else {                    // any other direction_id is going away from City
+            stopsArray = stops.slice().reverse();
         }
 
         for (let i in stopsArray) {
