@@ -38,6 +38,11 @@ router.get('/departures', asyncHandler(async (req, res, next) => {
 
 }));
 
+router.get('/check', asyncHandler(async (req, res, next) => {
+  const response = await API.healthCheck();
+  res.json(response.data);
+}));
+
 
 
 module.exports = router;
