@@ -54,6 +54,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
 var initiate = async function () {
+  console.time("initiate");
   let departures = [];
   let stops = [];
   let index;
@@ -101,6 +102,7 @@ var initiate = async function () {
               }
               app.locals.data = data;
               console.log("Initialized...");
+              console.timeEnd("initiate");
             }
           })
       })
@@ -109,6 +111,7 @@ var initiate = async function () {
 
 var recursive = async function () {
   if (app.locals.stops) {
+    console.time("recursive");
     let departures = [];
     stops = app.locals.stops;
     for (let i in routes) {
@@ -138,7 +141,9 @@ var recursive = async function () {
               runs: runs
             }
             console.log("Updated...");
+            console.log(data.runs.length);
             app.locals.data = data;
+            console.timeEnd("recursive");
           }
         })
     }
