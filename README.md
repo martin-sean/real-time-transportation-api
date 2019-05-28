@@ -81,3 +81,5 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ## Acknowledgments
 
 * Thanks to [Public Transport Victoria](https://www.ptv.vic.gov.au/footer/about-ptv/digital-tools-and-updates/) for providing access to their Timetable API's data 
+* Thanks to RMIT VXLab for providing access to the lab for development work and testing with the tiled displays
+
