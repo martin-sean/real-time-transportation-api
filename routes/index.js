@@ -8,15 +8,14 @@ var API = require('../modules/PTVapi');
 /* GET home page. */
 router.get('/', asyncHandler(async (req, res, next) => {
 
-  // const response = API.healthCheck();
-  // const stops = await API.getStops(3);
-
   if (req.app.locals.data) {
     res.json(req.app.locals.data);
   }
 
 }));
 
+
+// Handler for request of dynamic data (processed view)
 router.get('/train', asyncHandler(async (req, res, next) => {
   if (req.app.locals.data) {
     res.json(req.app.locals.data);
@@ -24,6 +23,7 @@ router.get('/train', asyncHandler(async (req, res, next) => {
 
 }));
 
+// Handler for request of static data (stops)
 router.get('/stops', asyncHandler(async (req, res, next) => {
   if (req.app.locals.stops) {
     res.json(req.app.locals.stops);
@@ -31,6 +31,7 @@ router.get('/stops', asyncHandler(async (req, res, next) => {
 
 }));
 
+// Handler for request of raw departures data
 router.get('/departures', asyncHandler(async (req, res, next) => {
   if (req.app.locals.departures) {
     res.json(req.app.locals.departures);
@@ -38,6 +39,7 @@ router.get('/departures', asyncHandler(async (req, res, next) => {
 
 }));
 
+// Handler for checking the connection to the API
 router.get('/check', asyncHandler(async (req, res, next) => {
   const response = await API.healthCheck();
   res.json(response.data);

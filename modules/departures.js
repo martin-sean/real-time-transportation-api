@@ -1,5 +1,6 @@
 const moment = require('moment');
 
+// Function to sort array according to the estimated_departure_time
 function compareDeparturesTime(a, b) {
     let aTime, bTime;
     if (a.estimated_departure_utc) {
@@ -27,6 +28,7 @@ function compareDeparturesTime(a, b) {
 }
 
 module.exports = {
+    // Obtaining the unique run ids from departures
     getUniqueRuns: function (departures, route_id) {
         let runs = [];
 
@@ -40,6 +42,7 @@ module.exports = {
 
         return runs;
     },
+    // Retrieving the departures for each unique runs to create a dictionary of run -> list of departures
     getDeparturesForRuns: function (runs, departures) {
         let filteredRuns = [];
         let run_id;
@@ -76,6 +79,7 @@ module.exports = {
 
         return filteredRuns;
     },
+    // Determine the coordinates of a train in between stations
     determineRunCoordinates: function (scalar, previousStopCoordinates, nextStopCoordinates) {
         const xCoordinate = (scalar * previousStopCoordinates[0]) + ((1 - scalar) * nextStopCoordinates[0]);
         const yCoordinate = (scalar * previousStopCoordinates[1]) + ((1 - scalar) * nextStopCoordinates[1]);

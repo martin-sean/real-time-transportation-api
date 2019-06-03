@@ -26,6 +26,7 @@ function compareStops(a, b) {
     return comparison;
 }
 
+// Call to PTV API to get departures for a specific stop
 async function getDeparturesForStop(route_id, stop_id) {
     const request = '/v3/departures/route_type/0/stop/' + stop_id + '/route/' + route_id + '?look_backwards=false&max_results=1&devid=' + devID;
     const signature = encryptSignature(request);
@@ -40,8 +41,8 @@ async function getDeparturesForStop(route_id, stop_id) {
     return departures;
 }
 
-// To check if the connection to the API is working
 module.exports = {
+    // To check if the connection to the API is working
     healthCheck: async function () {
         const timestamp = moment.utc().format();
         const request = '/v2/healthcheck?timestamp=' + timestamp + '&devid=' + devID;
@@ -55,6 +56,7 @@ module.exports = {
             })
         return result;
     },
+    // Function to retreive all the stops for a train line
     getStops: async function (route_id) {
         const request = '/v3/stops/route/' + route_id + '/route_type/0?direction_id=1&devid=' + devID;
         const signature = encryptSignature(request);
@@ -69,6 +71,7 @@ module.exports = {
             })
         return stops;
     },
+    // Functions to retreive all the departures for a train line
     getDeparturesForRoute: async function (route_id, stops) {
         let departures = [];
         for (let i in stops) {
@@ -86,51 +89,3 @@ module.exports = {
         return departures;
     }
 }
-
-
-// // Retrieve stops from the API for a specific line (route_id)
-// export async function getStops(route_id) {
-//     const request = '/v3/stops/route/' + route_id + '/route_type/0?direction_id=1&devid=' + devID;
-//     const signature = encryptSignature(request);
-
-//     const stops = await axios.get(baseURL + request + '&signature=' + signature)
-//         .then(response => {
-//             const stops = response.data.stops.sort(compareStops);
-//             return stops;
-//         })
-//         .catch(error => {
-//             console.log(error);
-//         })
-//     return stops;
-// }
-
-// async function getDeparturesForStop(route_id, stop_id) {
-//     const request = '/v3/departures/route_type/0/stop/' + stop_id + '/route/' + route_id + '?look_backwards=false&max_results=1&devid=' + devID;
-//     const signature = encryptSignature(request);
-
-//     const departures = await axios.get(baseURL + request + '&signature=' + signature)
-//         .then(response => {
-//             return response.data.departures;
-//         })
-//         .catch(error => {
-//             console.log(error);
-//         })
-//     return departures;
-// }
-
-// export async function getDeparturesForRoute(route_id, stops) {
-//     let departures = [];
-//     for (let i in stops) {
-//         const stop_id = stops[i].stop_id;
-
-//         departures.push(await getDeparturesForStop(route_id, stop_id)
-//             .then(response => {
-//                 return response;
-//             })
-//             .catch(error => {
-//                 console.log(error);
-//             })
-//         )
-//     }
-//     return departures;
-// }

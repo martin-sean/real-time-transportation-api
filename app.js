@@ -1,3 +1,4 @@
+// Load environment variables
 require('dotenv').config();
 
 var createError = require('http-errors');
@@ -6,16 +7,20 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 
+// Router to handle requests
 var indexRouter = require('./routes/index');
 
+// Self-defined modules
 var API = require('./modules/PTVapi');
 var Stations = require('./modules/stations');
 var Departures = require('./modules/departures');
 
 var app = express();
 
+// Route_id of the train lines
 const routes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17];
 
+// Function defined for sorting the array of stations ascendingly according to their route_id
 var sortStations = function (a, b) {
   const aRouteID = a[0].route_id;
   const bRouteID = b[0].route_id;
@@ -33,6 +38,7 @@ var sortStations = function (a, b) {
   return comparison;
 }
 
+// Function defined for sorting the array of departures ascendingly according to their route_id
 var sortDepartures = function (a, b) {
   const aRouteID = a[0][0].route_id;
   const bRouteID = b[0][0].route_id;
@@ -49,10 +55,12 @@ var sortDepartures = function (a, b) {
   return comparison;
 }
 
-// view engine setup
+// View engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
+
+// Function that initiates at the start of the app (process both static and dynamic data)
 var initiate = async function () {
   console.time("initiate");
   let departures = [];
@@ -84,6 +92,7 @@ var initiate = async function () {
               departures = departures.sort(sortDepartures);
               stops = stops.sort(sortStations);
 
+              // Storing the data in express
               app.locals.stops = stops;
               app.locals.departures = departures;
 
@@ -109,9 +118,10 @@ var initiate = async function () {
   }
 }
 
-var recursive = async function () {
+// Function that repeats every interval to retrieve the latest dynamic data and process it
+var repetition = async function () {
   if (app.locals.stops) {
-    console.time("recursive");
+    console.time("repetition");
     let departures = [];
     stops = app.locals.stops;
     for (let i in routes) {
@@ -143,7 +153,7 @@ var recursive = async function () {
             console.log("Updated...");
             console.log(data.runs.length);
             app.locals.data = data;
-            console.timeEnd("recursive");
+            console.timeEnd("repetition");
           }
         })
     }
@@ -151,7 +161,7 @@ var recursive = async function () {
 }
 
 initiate();
-setInterval(recursive, 15000);
+setInterval(repetition, 15000);
 
 app.use(logger('dev'));
 app.use(express.json());
