@@ -13,7 +13,7 @@ $ git clone https://github.com/JX-Siaw/real-time-transportation-api.git
 2) Create an .env file to store the environment variables. Refer to .env_example as a guidance
 
 3) Install the modules inside the project directory
-$ npm install 
+$ npm install
 ```
 
 ### Prerequisites
@@ -73,6 +73,8 @@ Make sure a reverse proxy is set up allowing the web app to call the API at the 
 ## Authors
 
 * **Jeremy Siaw** - *Initial work*
+* **Ngoc Tran** - *Follow up work*
+* **Sean Martin** - *Follow up work*
 
 ## License
 
@@ -80,7 +82,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* Thanks to [Public Transport Victoria](https://www.ptv.vic.gov.au/footer/about-ptv/digital-tools-and-updates/) for providing access to their Timetable API's data 
+* Thanks to [Public Transport Victoria](https://www.ptv.vic.gov.au/footer/about-ptv/digital-tools-and-updates/) for providing access to their Timetable API's data
 * Thanks to RMIT VXLab for providing access to the lab for development work and testing with the tiled displays
 * Thanks to RMIT University for providing me the opportunity to work on the project
-
