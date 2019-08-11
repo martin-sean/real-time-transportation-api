@@ -7,7 +7,7 @@
     "startdev": "nodemon ./bin/www"
   },
   "dependencies": {
-    "axios": "^0.18.0",
+    "axios": "^0.18.1",
     "cookie-parser": "~1.4.4",
     "crypto": "^1.0.1",
     "debug": "~2.6.9",
@@ -17,7 +17,7 @@
     "http-errors": "~1.6.3",
     "moment": "^2.24.0",
     "morgan": "~1.9.1",
-    "pug": "2.0.0-beta11"
+    "pug": "^2.0.4"
   },
   "devDependencies": {
     "nodemon": "^1.19.0"
