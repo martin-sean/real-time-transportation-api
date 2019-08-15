@@ -27,8 +27,8 @@ function compareStops(a, b) {
 }
 
 // Call to PTV API to get departures for a specific stop
-async function getDeparturesForStop(route_id, stop_id) {
-    const request = '/v3/departures/route_type/0/stop/' + stop_id + '/route/' + route_id + '?look_backwards=false&max_results=1&devid=' + devID;
+async function getDeparturesForStop(route_type, route_id, stop_id) {
+    const request = '/v3/departures/route_type/' + route_type + '/stop/' + stop_id + '/route/' + route_id + '?look_backwards=false&max_results=1&devid=' + devID;
     const signature = encryptSignature(request);
 
     const departures = await axios.get(baseURL + request + '&signature=' + signature)
@@ -57,8 +57,8 @@ module.exports = {
         return result;
     },
     // Function to retreive all the stops for a train line
-    getStops: async function (route_id) {
-        const request = '/v3/stops/route/' + route_id + '/route_type/0?direction_id=1&devid=' + devID;
+    getStops: async function (route_type, route_id) {
+        const request = '/v3/stops/route/' + route_id + '/route_type/' + route_type + '?direction_id=1&devid=' + devID;
         const signature = encryptSignature(request);
 
         const stops = await axios.get(baseURL + request + '&signature=' + signature)
@@ -72,13 +72,21 @@ module.exports = {
         return stops;
     },
     // Functions to retreive all the departures for a train line
-    getDeparturesForRoute: async function (route_id, stops) {
+    getDeparturesForRoute: async function (route_type, route_id, stops) {
         let departures = [];
         for (let i in stops) {
             const stop_id = stops[i].stop_id;
 
-            departures.push(await getDeparturesForStop(route_id, stop_id)
+            departures.push(await getDeparturesForStop(route_type, route_id, stop_id)
                 .then(response => {
+                    // Log whether route has estimated time
+                    for(let i in response) {
+                        if(response[i].estimated_departure_utc) {
+                            console.log("RouteID = " + response[i].route_id + ", estimated_departure_utc = " + response[i].estimated_departure_utc);
+                        } else {
+                            console.log("RouteID = " + response[i].route_id + ", estimated_departure_utc = NONE");
+                        }
+                    }
                     return response;
                 })
                 .catch(error => {
@@ -87,5 +95,18 @@ module.exports = {
             )
         }
         return departures;
+    },
+    // Get routes for a given transportation type.
+    getRoutes: async function (route_type) {
+        const request = '/v3/routes?route_types=' + route_type + '&devid=' + devID;
+        const signature = encryptSignature(request);
+        const routes = await axios.get(baseURL + request + '&signature=' + signature)
+            .then(response => {
+                return response.data.routes;
+            })
+            .catch(error => {
+                console.log(error);
+            })
+        return routes;
     }
 }
