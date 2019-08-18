@@ -26,9 +26,9 @@ function compareStops(a, b) {
     return comparison;
 }
 
-// Call to PTV API to get departures for a specific stop
-async function getDeparturesForStop(route_id, stop_id) {
-    const request = '/v3/departures/route_type/0/stop/' + stop_id + '/route/' + route_id + '?look_backwards=false&max_results=1&devid=' + devID;
+// Call to PTV API to get all departures for a specific stop
+async function getDeparturesForStop(stop_id) {
+    const request = '/v3/departures/route_type/0/stop/' + stop_id + '?look_backwards=false&max_results=1&devid=' + devID;
     const signature = encryptSignature(request);
 
     const departures = await axios.get(baseURL + request + '&signature=' + signature)
@@ -71,21 +71,50 @@ module.exports = {
             })
         return stops;
     },
-    // Functions to retreive all the departures for a train line
-    getDeparturesForRoute: async function (route_id, stops) {
-        let departures = [];
-        for (let i in stops) {
-            const stop_id = stops[i].stop_id;
+    // Retreive all the departures stations and routes
+    getDepartures: async function (routes, uniqueStops) {
+        let routeIndexes = [];
+        let routeDepartures = [];
+        let stationDepartures = [];
 
-            departures.push(await getDeparturesForStop(route_id, stop_id)
+        // Set up array of departures for each route ID
+        for(let i in routes) {
+            routeDepartures.push({
+                routeID: routes[i],
+                departures: []
+            })
+        }
+
+        for (let i in uniqueStops) {
+            const stop_id = uniqueStops[i].stop_id;
+            
+            // Get all departures for a station
+            let stopDepartures = {
+                stopID: stop_id,
+                stop_name: uniqueStops[i].stop_name,
+                stop_latitude: uniqueStops[i].stop_latitude,
+                stop_longitude: uniqueStops[i].stop_longitude,
+                departures: await getDeparturesForStop(stop_id)
                 .then(response => {
                     return response;
                 })
                 .catch(error => {
                     console.log(error);
-                })
-            )
+                }) 
+            };
+            stationDepartures.push(stopDepartures);
+
+            // Append departures from a station to associated route departure array
+            for(let j in stopDepartures.departures) {
+                let routeIndex = routes.indexOf(stopDepartures.departures[j].route_id);
+                if(routeIndex != -1) {
+                    routeDepartures[routeIndex].departures.push(stopDepartures.departures[j]);
+                }
+            }
         }
-        return departures;
+        return {
+            routeDepartures: routeDepartures,
+            stationDepartures: stationDepartures
+        };
     }
 }

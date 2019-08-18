@@ -1,11 +1,11 @@
 module.exports = {
     // Get coordinates of the stops that the train is currently in between
     getCoordinatesPair: function (stops, stop_id, direction_id) {
-
         let stopsArray;
         let previousStopCoordinates;
         let nextStopCoordinates;
         let previousStopID;
+        let valid = false;
 
         // Scenario when next stop is not the last stop
         if (direction_id === 1) {   // all direction_id 1 goes to City (Flinders Street)
@@ -25,9 +25,9 @@ module.exports = {
                     nextStopCoordinates = [stopsArray[i].stop_latitude, stopsArray[i].stop_longitude];
                     nextStopID = stopsArray[parseInt(i)].stop_id;
                 }
+                valid = true;
             }
         }
-
         return {
             previousStopCoordinates: previousStopCoordinates,
             nextStopCoordinates: nextStopCoordinates,
