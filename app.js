@@ -19,6 +19,10 @@ var app = express();
 
 // Route_id of the train lines
 const routes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17];
+// const routes = [11, 14];
+
+// Unused station stop IDs
+const FLEMINGTON_RC = 1070;
 
 // Function defined for sorting the array of stations ascendingly according to their route_id
 var sortStations = function (a, b) {
@@ -65,98 +69,190 @@ var initiate = async function () {
   console.time("initiate");
   let departures = [];
   let stops = [];
+  let stopIDs = new Set();
+  let uniqueStops = [];
   let index;
   for (let i in routes) {
     const route_id = routes[i];
+
+    // Get all stops for a given route
     API.getStops(route_id)
       .then(result => {
         const routeStops = result;
+
         for (let j in routeStops) {
-          if (routeStops[j].stop_id === 1070) {
+          let stopID = routeStops[j].stop_id;
+
+          // Detect unused staions
+          if (stopID === FLEMINGTON_RC) {
             index = j;
           }
-          routeStops[j].route_id = route_id;
+
+          // Keep track of unique stations
+          if(!stopIDs.has(stopID)) {
+            stopIDs.add(stopID);
+            uniqueStops.push({
+              stop_id: stopID,
+              stop_name: routeStops[j].stop_name,
+              stop_latitude: routeStops[j].stop_latitude,
+              stop_longitude: routeStops[j].stop_longitude
+            });
+          }
         }
+
+        // Remove unused stations
         if (index) {
           routeStops.splice(index, 1);
         }
-        stops.push(routeStops);
 
-        API.getDeparturesForRoute(route_id, result)
-          .then(response => {
-            departures.push(response);
-            if (departures.length === routes.length) {
-              let uniqueRuns;
-              let filteredRuns;
-              let runs = [];
-              departures = departures.sort(sortDepartures);
-              stops = stops.sort(sortStations);
+        stops.push({
+          routeID: route_id,
+          routeStops: routeStops
+        });
 
-              // Storing the data in express
-              app.locals.stops = stops;
-              app.locals.departures = departures;
+        // Get all departures for each unique stop when all stops are retrieved
+        if(stops.length === routes.length) {
+          stopIDsArray = Array.from(stopIDs);
 
-              for (let k in departures) {
-                uniqueRuns = Departures.getUniqueRuns(departures[k], routes[k]);
-                filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
-                for (let l in filteredRuns) {
-                  runs.push({
-                    departure: filteredRuns[l].departures,
-                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-                  });
+          API.getDepartures(routes, uniqueStops)
+            .then(response => {
+                let routeDepartures = response.routeDepartures;
+                let stationDepartures = response.stationDepartures;
+
+                let uniqueRunIDs;
+                let filteredRuns;
+                let runs = [];
+
+                // Storing the data in express
+                app.locals.routeStops = stops;
+                app.locals.stopIDs = stopIDsArray;
+                app.locals.uniqueStops = uniqueStops;
+                app.locals.routeDepartures = routeDepartures;
+                app.locals.stationDepartures = stationDepartures;
+
+                // Get depatures for every unique runID
+                for (let k in routeDepartures) {
+                  routeID = routeDepartures[k].routeID;
+                  uniqueRunIDs = Departures.getUniqueRuns(routeDepartures[k].departures);
+                  filteredRuns = Departures.getDeparturesForRuns(uniqueRunIDs, routeDepartures[k].departures);
+
+                  // Get array of departures for the given routeID
+                  let routeIDStops;
+                  for(let l in stops) {
+                    if(stops[l].routeID == routeID) {
+                      routeIDStops = stops[l].routeStops;
+                    }
+                  }
+
+                  // Remove runs that do not have stops in 
+                  for (let l in filteredRuns) {
+                    let target = new Set();
+                    let valid = 0;
+                    
+                    // Determine all stopIDs covered by all of a given runID departures
+                    for(let m in filteredRuns[l].departures) {
+                      target.add(filteredRuns[l].departures[m].stop_id);
+                    }
+
+                    // Determine if any of the runID stops match up with routeID Stops
+                    for(let m in routeIDStops) {
+                      if(target.has(routeIDStops[m].stop_id)) {
+                        valid++;
+                      }
+                    }
+
+                    // Require that runID stops are entirely in routeID stops
+                    if(valid == target.size) {
+                      runs.push({
+                        departure: filteredRuns[l].departures,
+                        coordinates: Stations.getCoordinatesPair(routeIDStops, filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
+                      });
+                    }
+                  }
                 }
-              }
-              const data = {
-                runs: runs
-              }
-              app.locals.data = data;
-              console.log("Initialized...");
-              console.timeEnd("initiate");
-            }
-          })
+                const data = {
+                  runs: runs
+                }
+                app.locals.data = data;
+
+                console.log("Initialized.");
+                console.timeEnd("initiate");
+            })
+        }
       })
   }
 }
 
 // Function that repeats every interval to retrieve the latest dynamic data and process it
 var repetition = async function () {
-  if (app.locals.stops) {
+  if (app.locals.routeStops) {
     console.time("repetition");
     let departures = [];
-    stops = app.locals.stops;
-    for (let i in routes) {
-      const route_id = routes[i];
-      API.getDeparturesForRoute(route_id, app.locals.stops[i])
-        .then(response => {
-          departures.push(response);
-          if (departures.length === routes.length) {
-            let uniqueRuns;
-            let filteredRuns;
-            let runs = [];
-            departures = departures.sort(sortDepartures);
-            app.locals.departures = departures;
+    let stops = app.locals.routeStops;
 
-            for (let k in departures) {
-              uniqueRuns = Departures.getUniqueRuns(departures[k], routes[k]);
-              filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
+    API.getDepartures(routes, app.locals.uniqueStops)
+      .then(response => {
+        let routeDepartures = response.routeDepartures;
+        let stationDepartures = response.stationDepartures;
 
-              for (let l in filteredRuns) {
-                runs.push({
-                  departure: filteredRuns[l].departures,
-                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-                });
+        // Update departures stored in Express
+        app.locals.routeDepartures = routeDepartures;
+        app.locals.stationDepartures = stationDepartures;
+
+        let uniqueRunIDs;
+        let filteredRuns;
+        let runs = [];
+
+        // Get depatures for every unique runID
+        for (let k in routeDepartures) {
+          routeID = routeDepartures[k].routeID;
+          uniqueRunIDs = Departures.getUniqueRuns(routeDepartures[k].departures);
+          filteredRuns = Departures.getDeparturesForRuns(uniqueRunIDs, routeDepartures[k].departures);
+
+          // Find array of departures for routeID
+          let routeIDStops;
+          for(let l in stops) {
+            if(stops[l].routeID == routeID) {
+              routeIDStops = stops[l].routeStops;
+            }
+          }
+
+          for (let l in filteredRuns) {
+            console.log("RunID " + filteredRuns[l].run_id + ", Num departures: " + filteredRuns[l].departures.length);
+            
+            let target = new Set();
+            let valid = 0;
+            
+            // Determine all stopIDs covered by all of a given runID departures
+            for(let m in filteredRuns[l].departures) {
+              target.add(filteredRuns[l].departures[m].stop_id);
+            }
+            
+            // Determine if any of the runID stops match up with routeID Stops
+            for(let m in routeIDStops) {
+              if(target.has(routeIDStops[m].stop_id)) {
+                valid++;
               }
             }
-            const data = {
-              runs: runs
+
+            // Require that runID stops are entirely in routeID stops
+            if(valid == target.size) {
+              runs.push({
+                departure: filteredRuns[l].departures,
+                coordinates: Stations.getCoordinatesPair(routeIDStops, filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
+              });
             }
-            console.log("Updated...");
-            console.log(data.runs.length);
-            app.locals.data = data;
-            console.timeEnd("repetition");
           }
-        })
-    }
+        }
+        const data = {
+          runs: runs
+        }
+        app.locals.data = data;
+
+        console.log("Updated...");
+        console.log(data.runs.length);
+        console.timeEnd("repetition");
+      })
   }
 }
 
