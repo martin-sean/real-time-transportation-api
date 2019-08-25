@@ -19,7 +19,7 @@ var app = express();
 
 // Transport type to lookup
 // 0 = Train, 1 = Tram
-const ROUTE_TYPE = 1;
+const ROUTE_TYPE = 0;
 
 // Unused station stop IDs
 const FLEMINGTON_RC = 1070;
@@ -134,9 +134,7 @@ var initiate = async function () {
 
                     // Storing the data in express
                     app.locals.routeStops = stops;
-                    app.locals.stopIDs = stopIDsArray;
                     app.locals.uniqueStops = uniqueStops;
-                    app.locals.routeDepartures = routeDepartures;
                     app.locals.stationDepartures = stationDepartures;
 
                     // Get depatures for every unique runID
@@ -206,7 +204,6 @@ var repetition = async function () {
         let stationDepartures = response.stationDepartures;
 
         // Update departures stored in Express
-        app.locals.routeDepartures = routeDepartures;
         app.locals.stationDepartures = stationDepartures;
 
         let uniqueRunIDs;
