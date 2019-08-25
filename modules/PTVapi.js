@@ -26,6 +26,17 @@ function compareStops(a, b) {
     return comparison;
 }
 
+// Used to determine where a route ID is inside of the route descriptions
+function getRouteIndex(route, route_id) {
+    result = -1;
+    for(let i in route) {
+        if(route[i].route_id == route_id) {
+            return i;
+        }
+    }
+    return result;
+}
+
 // Call to PTV API to get all departures for a specific stop
 async function getDeparturesForStop(stop_id, route_type) {
     const request = '/v3/departures/route_type/' + route_type + '/stop/' + stop_id + '?look_backwards=false&max_results=1&devid=' + devID;
@@ -71,7 +82,7 @@ module.exports = {
             })
         return stops;
     },
-    // Retreive all the departures stations and routes
+    // Retreive all the departures for stations and routes
     getDepartures: async function (routes, route_type, uniqueStops) {
         let routeIndexes = [];
         let routeDepartures = [];
@@ -80,7 +91,7 @@ module.exports = {
         // Set up array of departures for each route ID
         for(let i in routes) {
             routeDepartures.push({
-                routeID: routes[i],
+                routeID: routes[i].route_id,
                 departures: []
             })
         }
@@ -90,7 +101,7 @@ module.exports = {
             
             // Get all departures for a station
             let stopDepartures = {
-                stopID: stop_id,
+                stop_id: stop_id,
                 stop_name: uniqueStops[i].stop_name,
                 stop_latitude: uniqueStops[i].stop_latitude,
                 stop_longitude: uniqueStops[i].stop_longitude,
@@ -102,12 +113,14 @@ module.exports = {
                     console.log(error);
                 }) 
             };
-            console.log("Progress: " + i + "/" + uniqueStops.length);
+            console.log("(" + i + "/" + uniqueStops.length +
+                        ") Updating " + stopDepartures.stop_name +
+                        " (ID = " + stopDepartures.stop_id +")");
             stationDepartures.push(stopDepartures);
 
             // Append departures from a station to associated route departure array
             for(let j in stopDepartures.departures) {
-                let routeIndex = routes.indexOf(stopDepartures.departures[j].route_id);
+                let routeIndex = getRouteIndex(routes, stopDepartures.departures[j].route_id);
                 if(routeIndex != -1) {
                     routeDepartures[routeIndex].departures.push(stopDepartures.departures[j]);
                 }
@@ -129,7 +142,6 @@ module.exports = {
             .catch(error => {
                 console.log(error);
             })
-        console.log(routes);
         return routes;
     }
 }

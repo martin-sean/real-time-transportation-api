@@ -78,12 +78,13 @@ var initiate = async function () {
   // Get all routes for route type
   API.getRoutes(ROUTE_TYPE)
     .then(result => {
-      for(let i in result) {
-        routes.push(result[i].route_id);
-      }
-      console.log(routes);
+      // for(let i in result) {
+      //   routes.push(result[i].route_id);
+      // }
+      routes = result;
       for (let i in routes) {
-        const route_id = routes[i];
+        const route_id = routes[i].route_id;
+        console.log("ROUTE ID = " + route_id + " (" + routes[i].route_name + ")");
 
         // Get all stops for a given route
         API.getStops(route_id, ROUTE_TYPE)
@@ -122,6 +123,9 @@ var initiate = async function () {
 
             // Get all departures for each unique stop when all stops are retrieved
             if(stops.length === routes.length) {
+              // Store route descriptions
+              app.locals.routes = routes;
+
               stopIDsArray = Array.from(stopIDs);
               API.getDepartures(routes, ROUTE_TYPE, uniqueStops)
                 .then(response => {
@@ -221,6 +225,7 @@ var repetition = async function () {
           for(let l in stops) {
             if(stops[l].routeID == routeID) {
               routeIDStops = stops[l].routeStops;
+              break;
             }
           }
 

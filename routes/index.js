@@ -12,8 +12,15 @@ router.get('/', asyncHandler(async (req, res, next) => {
   }
 }));
 
+// Handler for request of route descriptions data
+router.get('/routes', asyncHandler(async (req, res, next) => {
+  if (req.app.locals.routes) {
+    res.json(req.app.locals.routes);
+  }
+}));
+
 // Handler for request of dynamic data (processed view)
-router.get('/train', asyncHandler(async (req, res, next) => {
+router.get('/runs', asyncHandler(async (req, res, next) => {
   if (req.app.locals.data) {
     res.json(req.app.locals.data);
   }
@@ -23,13 +30,6 @@ router.get('/train', asyncHandler(async (req, res, next) => {
 router.get('/stationDepartures', asyncHandler(async (req, res, next) => {
   if (req.app.locals.stationDepartures) {
     res.json(req.app.locals.stationDepartures);
-  }
-}));
-
-// Handler for request of station data
-router.get('/uniqueStops', asyncHandler(async (req, res, next) => {
-  if (req.app.locals.uniqueStops) {
-    res.json(req.app.locals.uniqueStops);
   }
 }));
 
