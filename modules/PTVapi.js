@@ -26,9 +26,20 @@ function compareStops(a, b) {
     return comparison;
 }
 
+// Used to determine where a route ID is inside of the route descriptions
+function getRouteIndex(route, route_id) {
+    result = -1;
+    for(let i in route) {
+        if(route[i].route_id == route_id) {
+            return i;
+        }
+    }
+    return result;
+}
+
 // Call to PTV API to get all departures for a specific stop
-async function getDeparturesForStop(stop_id) {
-    const request = '/v3/departures/route_type/0/stop/' + stop_id + '?look_backwards=false&max_results=1&devid=' + devID;
+async function getDeparturesForStop(stop_id, route_type) {
+    const request = '/v3/departures/route_type/' + route_type + '/stop/' + stop_id + '?look_backwards=false&max_results=1&devid=' + devID;
     const signature = encryptSignature(request);
 
     const departures = await axios.get(baseURL + request + '&signature=' + signature)
@@ -57,8 +68,8 @@ module.exports = {
         return result;
     },
     // Function to retreive all the stops for a train line
-    getStops: async function (route_id) {
-        const request = '/v3/stops/route/' + route_id + '/route_type/0?direction_id=1&devid=' + devID;
+    getStops: async function (route_id, route_type) {
+        const request = '/v3/stops/route/' + route_id + '/route_type/' + route_type + '?direction_id=1&devid=' + devID;
         const signature = encryptSignature(request);
 
         const stops = await axios.get(baseURL + request + '&signature=' + signature)
@@ -71,8 +82,8 @@ module.exports = {
             })
         return stops;
     },
-    // Retreive all the departures stations and routes
-    getDepartures: async function (routes, uniqueStops) {
+    // Retreive all the departures for stations and routes
+    getDepartures: async function (routes, route_type, uniqueStops) {
         let routeIndexes = [];
         let routeDepartures = [];
         let stationDepartures = [];
@@ -80,7 +91,7 @@ module.exports = {
         // Set up array of departures for each route ID
         for(let i in routes) {
             routeDepartures.push({
-                routeID: routes[i],
+                routeID: routes[i].route_id,
                 departures: []
             })
         }
@@ -90,11 +101,11 @@ module.exports = {
             
             // Get all departures for a station
             let stopDepartures = {
-                stopID: stop_id,
+                stop_id: stop_id,
                 stop_name: uniqueStops[i].stop_name,
                 stop_latitude: uniqueStops[i].stop_latitude,
                 stop_longitude: uniqueStops[i].stop_longitude,
-                departures: await getDeparturesForStop(stop_id)
+                departures: await getDeparturesForStop(stop_id, route_type)
                 .then(response => {
                     return response;
                 })
@@ -102,11 +113,14 @@ module.exports = {
                     console.log(error);
                 }) 
             };
+            console.log("(" + i + "/" + uniqueStops.length +
+                        ") Updating " + stopDepartures.stop_name +
+                        " (ID = " + stopDepartures.stop_id +")");
             stationDepartures.push(stopDepartures);
 
             // Append departures from a station to associated route departure array
             for(let j in stopDepartures.departures) {
-                let routeIndex = routes.indexOf(stopDepartures.departures[j].route_id);
+                let routeIndex = getRouteIndex(routes, stopDepartures.departures[j].route_id);
                 if(routeIndex != -1) {
                     routeDepartures[routeIndex].departures.push(stopDepartures.departures[j]);
                 }
@@ -116,5 +130,18 @@ module.exports = {
             routeDepartures: routeDepartures,
             stationDepartures: stationDepartures
         };
+    },
+    // Get routes for a given transportation type.
+    getRoutes: async function (route_type) {
+        const request = '/v3/routes?route_types=' + route_type + '&devid=' + devID;
+        const signature = encryptSignature(request);
+        const routes = await axios.get(baseURL + request + '&signature=' + signature)
+            .then(response => {
+                return response.data.routes;
+            })
+            .catch(error => {
+                console.log(error);
+            })
+        return routes;
     }
 }
