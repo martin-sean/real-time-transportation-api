@@ -78,13 +78,20 @@ var initiate = async function () {
   // Get all routes for route type
   API.getRoutes(ROUTE_TYPE)
     .then(result => {
-      // for(let i in result) {
-      //   routes.push(result[i].route_id);
-      // }
       routes = result;
       for (let i in routes) {
         const route_id = routes[i].route_id;
         console.log("ROUTE ID = " + route_id + " (" + routes[i].route_name + ")");
+
+        // Get directions
+        API.getDirecions(route_id)
+          .then(result => {
+              routes[i].directions = result;
+              console.log("Route ID " + route_id + " directions:");
+              for(let j in routes[i].directions) {
+                  console.log("\t ID: " + result[j].direction_id + " = " + result[j].direction_name);
+              }
+          })
 
         // Get all stops for a given route
         API.getStops(route_id, ROUTE_TYPE)
@@ -155,11 +162,11 @@ var initiate = async function () {
                         }
                       }
 
-                      // Remove runs that do not have stops in 
+                      // Remove runs that do not have stops in
                       for (let l in filteredRuns) {
                         let target = new Set();
                         let valid = 0;
-                        
+
                         // Determine all stopIDs covered by all of a given runID departures
                         for(let m in filteredRuns[l].departures) {
                           target.add(filteredRuns[l].departures[m].stop_id);
@@ -231,15 +238,15 @@ var repetition = async function () {
 
           for (let l in filteredRuns) {
             console.log("RunID " + filteredRuns[l].run_id + ", Num departures: " + filteredRuns[l].departures.length);
-            
+
             let target = new Set();
             let valid = 0;
-            
+
             // Determine all stopIDs covered by all of a given runID departures
             for(let m in filteredRuns[l].departures) {
               target.add(filteredRuns[l].departures[m].stop_id);
             }
-            
+
             // Determine if any of the runID stops match up with routeID Stops
             for(let m in routeIDStops) {
               if(target.has(routeIDStops[m].stop_id)) {

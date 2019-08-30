@@ -98,7 +98,7 @@ module.exports = {
 
         for (let i in uniqueStops) {
             const stop_id = uniqueStops[i].stop_id;
-            
+
             // Get all departures for a station
             let stopDepartures = {
                 stop_id: stop_id,
@@ -111,7 +111,7 @@ module.exports = {
                 })
                 .catch(error => {
                     console.log(error);
-                }) 
+                })
             };
             console.log("(" + i + "/" + uniqueStops.length +
                         ") Updating " + stopDepartures.stop_name +
@@ -143,5 +143,18 @@ module.exports = {
                 console.log(error);
             })
         return routes;
+    },
+    // Get directions for a given route ID.
+    getDirecions: async function (route_id) {
+        const request = '/v3/directions/route/' + route_id + '?devid=' + devID;
+        const signature = encryptSignature(request);
+        const directions = await axios.get(baseURL + request + '&signature=' + signature)
+            .then(response => {
+                return response.data.directions;
+            })
+            .catch(error => {
+                console.log(error);
+            })
+        return directions;
     }
 }
