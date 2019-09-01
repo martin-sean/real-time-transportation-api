@@ -26,6 +26,12 @@ const FLEMINGTON_RC = 1070;
 
 var routes = [];
 
+// PTV API call frequency (30 seconds)
+const PTV_API_REP_FREQ = 30 * 1000;
+
+// Demand threshold since last client connected (60 seconds)
+const API_DEMAND_THRESHOLD = 60 * 1000;
+
 // Function defined for sorting the array of stations ascendingly according to their route_id
 var sortStations = function (a, b) {
   const aRouteID = a[0].route_id;
@@ -84,7 +90,7 @@ var initiate = async function () {
         console.log("ROUTE ID = " + route_id + " (" + routes[i].route_name + ")");
 
         // Get directions
-        API.getDirecions(route_id)
+        API.getDirections(route_id)
           .then(result => {
               routes[i].directions = result;
               console.log("Route ID " + route_id + " directions:");
@@ -204,6 +210,12 @@ var initiate = async function () {
 
 // Function that repeats every interval to retrieve the latest dynamic data and process it
 var repetition = async function () {
+  // Return if the last API call was longer than the threshold
+  if (!API.getLastUpdate() || new Date().getTime() - API.getLastUpdate() > API_DEMAND_THRESHOLD) {
+    console.log("--No clients connected--");
+    return;
+  }
+
   if (app.locals.routeStops) {
     console.time("repetition");
     let departures = [];
@@ -276,7 +288,7 @@ var repetition = async function () {
 }
 
 initiate();
-setInterval(repetition, 15000);
+setInterval(repetition, PTV_API_REP_FREQ);
 
 app.use(logger('dev'));
 app.use(express.json());

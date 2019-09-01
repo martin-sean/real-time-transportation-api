@@ -6,6 +6,8 @@ const baseURL = 'https://timetableapi.ptv.vic.gov.au';
 const apiKey = process.env.API_KEY;
 const devID = process.env.DEV_ID;
 
+// Time of last Client API call (Date().getTime())
+let lastUpdate;
 
 // Generate signature for the API request
 function encryptSignature(url) {
@@ -145,7 +147,7 @@ module.exports = {
         return routes;
     },
     // Get directions for a given route ID.
-    getDirecions: async function (route_id) {
+    getDirections: async function (route_id) {
         const request = '/v3/directions/route/' + route_id + '?devid=' + devID;
         const signature = encryptSignature(request);
         const directions = await axios.get(baseURL + request + '&signature=' + signature)
@@ -156,5 +158,13 @@ module.exports = {
                 console.log(error);
             })
         return directions;
+    },
+    // Notify when a client calls this API
+    notifyUpdate: function () {
+        lastUpdate = new Date().getTime();
+    },
+    // Get the time of the last Client API call
+    getLastUpdate: function() {
+        return lastUpdate;
     }
-}
+};
