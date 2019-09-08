@@ -1,9 +1,9 @@
-var express = require('express');
-var asyncHandler = require('express-async-handler');
-var router = express.Router();
+const express = require('express');
+const asyncHandler = require('express-async-handler');
+const router = express.Router();
 
-var API = require('../modules/PTVapi');
-
+const API = require('../modules/PTVapi');
+const App = require('../app');
 
 /* GET home page. */
 router.get('/', asyncHandler(async (req, res, next) => {
@@ -42,6 +42,12 @@ router.get('/check', asyncHandler(async (req, res, next) => {
   API.notifyUpdate();
   const response = await API.healthCheck();
   res.json(response.data);
+}));
+
+// Handler for swapping transport type
+router.post('/swapRouteType', asyncHandler(async (req, res, next) => {
+  API.notifyUpdate();
+  App.notifyToggleRouteType();
 }));
 
 module.exports = router;

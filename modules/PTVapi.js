@@ -30,9 +30,9 @@ function compareStops(a, b) {
 
 // Used to determine where a route ID is inside of the route descriptions
 function getRouteIndex(route, route_id) {
-    result = -1;
+    let result = -1;
     for(let i in route) {
-        if(route[i].route_id == route_id) {
+        if(route[i].route_id === route_id) {
             return i;
         }
     }
@@ -69,7 +69,7 @@ module.exports = {
             })
         return result;
     },
-    // Function to retreive all the stops for a train line
+    // Function to retrieve all the stops for a train line
     getStops: async function (route_id, route_type) {
         const request = '/v3/stops/route/' + route_id + '/route_type/' + route_type + '?direction_id=1&devid=' + devID;
         const signature = encryptSignature(request);
@@ -84,7 +84,7 @@ module.exports = {
             })
         return stops;
     },
-    // Retreive all the departures for stations and routes
+    // Retrieve all the departures for stations and routes
     getDepartures: async function (routes, route_type, uniqueStops) {
         let routeIndexes = [];
         let routeDepartures = [];
@@ -123,7 +123,7 @@ module.exports = {
             // Append departures from a station to associated route departure array
             for(let j in stopDepartures.departures) {
                 let routeIndex = getRouteIndex(routes, stopDepartures.departures[j].route_id);
-                if(routeIndex != -1) {
+                if(routeIndex !== -1) {
                     routeDepartures[routeIndex].departures.push(stopDepartures.departures[j]);
                 }
             }
@@ -164,7 +164,7 @@ module.exports = {
         lastUpdate = new Date().getTime();
     },
     // Get the time of the last Client API call
-    getLastUpdate: function() {
+    get lastUpdate() {
         return lastUpdate;
     }
 };
