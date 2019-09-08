@@ -4,7 +4,6 @@ var router = express.Router();
 
 var API = require('../modules/PTVapi');
 
-
 /* GET home page. */
 router.get('/', asyncHandler(async (req, res, next) => {
   if (req.app.locals.data) {
