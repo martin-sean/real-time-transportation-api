@@ -27,11 +27,13 @@ const FLEMINGTON_RC = 1070;
 
 let routes = [];
 
-// PTV API call frequency (30 seconds)
-const PTV_API_REP_FREQ = 30 * 1000;
+const SECONDS_TO_MS = 1000;
 
-// Demand threshold since last client connected (60 seconds)
-const API_DEMAND_THRESHOLD = 60 * 1000;
+// Set default PTV API call frequency (30 seconds)
+let ptvAPIRepFreq = 30 * SECONDS_TO_MS;
+
+// Set default demand threshold since last client connected (60 seconds)
+let apiDemandThreshold = 60 * SECONDS_TO_MS;
 
 // Sort array of stations by route_id in ascending order
 const sortStations = function (a, b) {
@@ -212,8 +214,8 @@ const initiate = async function () {
 // Function that repeats every interval to retrieve the latest dynamic data and process it
 const repetition = async function () {
   // Return if the last API call was longer than the threshold
-  if (!API.lastUpdate || new Date().getTime() - API.lastUpdate > API_DEMAND_THRESHOLD) {
-    console.log("No clients are connected");
+  if (!API.getLastUpdate() || new Date().getTime() - API.getLastUpdate() > apiDemandThreshold) {
+    console.log("--No clients connected--");
     return;
   }
 
@@ -235,7 +237,7 @@ const repetition = async function () {
     app.locals.uniqueStops = [];
     app.locals.stationDepartures = [];
     await initiate();
-    setInterval(repetition, PTV_API_REP_FREQ);
+    setInterval(repetition, apiDemandThreshold);
   }
 
   if (app.locals.routeStops) {
@@ -311,7 +313,7 @@ const repetition = async function () {
 };
 
 initiate();
-setInterval(repetition, PTV_API_REP_FREQ);
+var refresh = setInterval(repetition, ptvAPIRepFreq);
 
 // TODO: Cleanup
 // Cyclic dependency with index.js, module.exports must be called before requiring index.js.
@@ -333,8 +335,35 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+
+// Forward other requests to router
 app.use('/', indexRouter);
 app.use('/api', indexRouter);
+
+// Handle requests to update refresh rate
+app.use('/refresh', function (req, res, next) {
+  if(refresh != null) {
+    if(req.body.refreshRate != null) {
+      let refreshRate = req.body.refreshRate;
+
+      res.send("Updating refresh rate to: " + refreshRate + " seconds");
+      console.log("Updating refresh rate to: " + refreshRate + " seconds");
+
+      // Reset refresh timer with new rate
+      API.notifyUpdate();
+      clearInterval(refresh);
+      ptvAPIRepFreq = refreshRate * SECONDS_TO_MS;
+      refresh = setInterval(repetition, ptvAPIRepFreq);
+
+      apiDemandThreshold = 2 * ptvAPIRepFreq;
+    } else {
+      // Return current refresh rate
+      res.json({refresh: ptvAPIRepFreq / SECONDS_TO_MS});
+    }
+  } else {
+    res.send("Wait for initialisation to finish...");
+  }
+});
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -351,4 +380,3 @@ app.use(function (err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
-
