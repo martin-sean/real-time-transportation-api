@@ -214,7 +214,7 @@ const initiate = async function () {
 // Function that repeats every interval to retrieve the latest dynamic data and process it
 const repetition = async function () {
   // Return if the last API call was longer than the threshold
-  if (!API.getLastUpdate() || new Date().getTime() - API.getLastUpdate() > apiDemandThreshold) {
+  if (!API.lastUpdate || new Date().getTime() - API.lastUpdate > apiDemandThreshold) {
     console.log("--No clients connected--");
     return;
   }
