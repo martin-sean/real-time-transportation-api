@@ -50,6 +50,7 @@ async function getDeparturesForStop(stop_id, route_type) {
         })
         .catch(error => {
             console.log(error);
+            return [];
         })
     return departures;
 }
@@ -81,6 +82,7 @@ module.exports = {
             })
             .catch(error => {
                 console.log(error);
+                return [];
             })
         return stops;
     },
@@ -113,6 +115,7 @@ module.exports = {
                 })
                 .catch(error => {
                     console.log(error);
+                    return [];
                 })
             };
             console.log("(" + i + "/" + uniqueStops.length +
@@ -143,6 +146,7 @@ module.exports = {
             })
             .catch(error => {
                 console.log(error);
+                return [];
             })
         return routes;
     },
@@ -156,6 +160,7 @@ module.exports = {
             })
             .catch(error => {
                 console.log(error);
+                return [];
             })
         return directions;
     },
