@@ -74,246 +74,209 @@ const sortDepartures = function (a, b) {
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
-// Function that initiates at the start of the app (process both static and dynamic data)
-const initiate = async function () {
-  console.time("initiate");
-  let departures = [];
-  let stops = [];
-  let stopIDs = new Set();
-  let uniqueStops = [];
-  let index;
 
-  // Get all routes for route type
+/**
+ * Initially populate the maps data structures
+ *
+ * @returns {Promise<void>} Not currently used
+ */
+async function initiate() {
+  console.time("initiate");
+  // Get all routes for a given route type (Train/Tram)
   API.getRoutes(ROUTE_TYPE)
       .then(result => {
-        routes = result;
-        for (let i in routes) {
-
-          const route_id = routes[i].route_id;
-          console.log("ROUTE ID = " + route_id + " (" + routes[i].route_name + ")");
-
-          // Get directions
-          API.getDirections(route_id)
-              .then(result => {
-                routes[i].directions = result;
-                console.log("Route ID " + route_id + " directions:");
-                for (let j in routes[i].directions) {
-                  console.log("\t ID: " + result[j].direction_id + " = " + result[j].direction_name);
-                }
-              });
-
-          // Get all stops for a given route
-          API.getStops(route_id, ROUTE_TYPE)
-              .then(result => {
-                const routeStops = result;
-
-                for (let j in routeStops) {
-                  let stopID = routeStops[j].stop_id;
-
-                  // Detect unused stations
-                  if (stopID === FLEMINGTON_RC) {
-                    index = j;
-                  }
-
-                  // Keep track of unique stations
-                  if (!stopIDs.has(stopID)) {
-                    stopIDs.add(stopID);
-                    uniqueStops.push({
-                      stop_id: stopID,
-                      stop_name: routeStops[j].stop_name,
-                      stop_latitude: routeStops[j].stop_latitude,
-                      stop_longitude: routeStops[j].stop_longitude
-                    });
-                  }
-                }
-
-                // Remove unused stations
-                if (index) {
-                  routeStops.splice(index, 1);
-                }
-
-                stops.push({
-                  routeID: route_id,
-                  routeStops: routeStops
-                });
-
-                // Get all departures for each unique stop when all stops are retrieved
-                if (stops.length === routes.length) {
-                  // Store route descriptions
-                  app.locals.routes = routes;
-
-                  stopIDsArray = Array.from(stopIDs);
-                  API.getDepartures(routes, ROUTE_TYPE, uniqueStops)
-                      .then(response => {
-                        let routeDepartures = response.routeDepartures;
-                        let stationDepartures = response.stationDepartures;
-
-                        let uniqueRunIDs;
-                        let filteredRuns;
-                        let runs = [];
-
-                        // Storing the data in express
-                        app.locals.routeStops = stops;
-                        app.locals.uniqueStops = uniqueStops;
-                        app.locals.stationDepartures = stationDepartures;
-
-                        // Get depatures for every unique runID
-                        for (let k in routeDepartures) {
-                          routeID = routeDepartures[k].routeID;
-                          uniqueRunIDs = Departures.getUniqueRuns(routeDepartures[k].departures);
-                          filteredRuns = Departures.getDeparturesForRuns(uniqueRunIDs, routeDepartures[k].departures);
-
-                          // Get array of departures for the given routeID
-                          let routeIDStops;
-                          for (let l in stops) {
-                            if (stops[l].routeID === routeID) {
-                              routeIDStops = stops[l].routeStops;
-                            }
-                          }
-
-                          // Remove runs that do not have stops in
-                          for (let l in filteredRuns) {
-                            let target = new Set();
-                            let valid = 0;
-
-                            // Determine all stopIDs covered by all of a given runID departures
-                            for (let m in filteredRuns[l].departures) {
-                              target.add(filteredRuns[l].departures[m].stop_id);
-                            }
-
-                            // Determine if any of the runID stops match up with routeID Stops
-                            for (let m in routeIDStops) {
-                              if (target.has(routeIDStops[m].stop_id)) {
-                                valid++;
-                              }
-                            }
-
-                            // Require that runID stops are entirely in routeID stops
-                            if (valid === target.size) {
-                              runs.push({
-                                departure: filteredRuns[l].departures,
-                                coordinates: Stations.getCoordinatesPair(routeIDStops, filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-                              });
-                            }
-                          }
-                        }
-                        app.locals.data = {
-                          runs: runs
-                        };
-
-                        console.log("Initialized.");
-                        console.timeEnd("initiate");
-                        repetitionReady = true;
-                      })
-                }
-              })
+        routes = result; // Save the routes in the instance variable
+        let stops = [];
+        let uniqueStops = [];
+        // For each route, get the stops and directions
+        for (let route in routes) {
+          const route_id = routes[route].route_id;
+          console.log("ROUTE ID = " + route_id + " (" + routes[route].route_name + ")");
+          getDirectionsForRoute(route, route_id);
+          getStopsForRoute(route_id, stops, uniqueStops);
         }
       });
 };
 
-// Function that repeats every interval to retrieve the latest dynamic data and process it
-const repetition = async function () {
-  // Return if the last API call was longer than the threshold
-  if (!API.lastUpdate || new Date().getTime() - API.lastUpdate > apiDemandThreshold) {
-    console.log("--No clients connected--");
-    return;
-  }
+/**
+ * Get directions for a given route
+ *
+ * @param route       Route data from the API
+ * @param route_id    Associated id of @param route
+ */
+async function getDirectionsForRoute(route, route_id) {
+  API.getDirections(route_id)
+      .then(directions => {
+        routes[route].directions = directions;
+        console.log("Route ID " + route_id + " directions:");
+        for (let direction in routes[route].directions) {
+          console.log("\t ID: " + directions[direction].direction_id + " = " + directions[direction].direction_name);
+        }
+      });
+}
 
-  // Only allow single repetition running
-  if (!repetitionReady) {
-    console.log("Already Running");
-    return;
-  }
+/**
+ * Get the stops for a given route
+ *
+ * @param route_id      id of the route to get stops for
+ * @param stops         collection of stops to get departures for
+ * @param uniqueStops   collection of unique stops
+ */
+async function getStopsForRoute(route_id, stops, uniqueStops) {
+  API.getStops(route_id, ROUTE_TYPE)
+      .then(routeStops => {
+        let index; // Index of unused station
+
+        // For each stop in a route
+        for (let stop in routeStops) {
+          let stopID = routeStops[stop].stop_id;
+          // Detect unused stations
+          if (stopID === FLEMINGTON_RC) {
+            index = stop;
+          }
+          // Build a list of distinct stops
+          let stopIDs = new Set();
+          if (!stopIDs.has(stopID)) {
+            stopIDs.add(stopID);
+            uniqueStops.push({
+              stop_id: stopID,
+              stop_name: routeStops[stop].stop_name,
+              stop_latitude: routeStops[stop].stop_latitude,
+              stop_longitude: routeStops[stop].stop_longitude
+            });
+          }
+        } // end of for each loop
+
+        // Remove unused stations
+        if (index) {
+          routeStops.splice(index, 1);
+        }
+
+        // Build stops collection
+        stops.push({
+          routeID: route_id,
+          routeStops: routeStops
+        });
+
+        // Get all departures for each unique stop when all stops are retrieved
+        if (stops.length === routes.length) {
+          // Store route descriptions
+          app.locals.routes = routes;
+          getDeparturesForStops(stops, uniqueStops, false)
+        }
+      })
+}
+
+/**
+ * Get the departures for a given stop
+ *
+ * @param stops           collection of stops in a route
+ * @param uniqueStops     collection of unique stops in a route
+ * @param repetition      false if initial run, true for repetitions
+ */
+async function getDeparturesForStops(stops, uniqueStops, repetition) {
+  API.getDepartures(routes, ROUTE_TYPE, uniqueStops)
+      .then(response => {
+        let routeDepartures = response.routeDepartures;
+        let stationDepartures = response.stationDepartures;
+
+        let uniqueRunIDs;
+        let filteredRuns;
+        let runs = [];
+
+        // Storing the data in express
+        if (repetition) {
+          app.locals.routeStops = stops;
+          app.locals.uniqueStops = uniqueStops;
+        }
+        app.locals.stationDepartures = stationDepartures;
+
+        // Get departures for every unique runID
+        for (let k in routeDepartures) {
+          const routeID = routeDepartures[k].routeID;
+          uniqueRunIDs = Departures.getUniqueRuns(routeDepartures[k].departures);
+          filteredRuns = Departures.getDeparturesForRuns(uniqueRunIDs, routeDepartures[k].departures);
+
+          // Get array of departures for the given routeID
+          let routeIDStops;
+          for (let l in stops) {
+            if (stops[l].routeID === routeID) {
+              routeIDStops = stops[l].routeStops;
+              if (repetition) break;
+            }
+          }
+
+          // Remove runs that do not have stops in
+          for (let l in filteredRuns) {
+            console.log("RunID " + filteredRuns[l].run_id + ", Num departures: " + filteredRuns[l].departures.length);
+
+            let target = new Set();
+            let valid = 0;
+
+            // Determine all stopIDs covered by all of a given runID departures
+            for (let m in filteredRuns[l].departures) {
+              target.add(filteredRuns[l].departures[m].stop_id);
+            }
+
+            // Determine if any of the runID stops match up with routeID Stops
+            for (let m in routeIDStops) {
+              if (target.has(routeIDStops[m].stop_id)) {
+                valid++;
+              }
+            }
+
+            // Require that runID stops are entirely in routeID stops
+            if (valid === target.size) {
+              runs.push({
+                departure: filteredRuns[l].departures,
+                coordinates: Stations.getCoordinatesPair(routeIDStops, filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
+              });
+            }
+          }
+        }
+        app.locals.data = {
+          runs: runs
+        };
+
+        console.log(repetition ? "Updated..." : "Initialised...");
+        console.log(app.locals.data.runs.length);
+        console.timeEnd(repetition ? "repetition" : "initiate");
+        repetitionReady = true;
+      })
+}
+
+/**
+ * Runs every ptvAPIRepFreq milliseconds to update the departures
+ *
+ * @returns {Promise<void>}   Not used
+ */
+async function repetition() {
+  // Return if there are no recent requests clients
+  if (!API.lastUpdate || new Date().getTime() - API.lastUpdate > apiDemandThreshold) return console.log("--No clients connected--");
+  // Return if a repetition is already running
+  if (!repetitionReady) return console.log("Repetition is already running")
   repetitionReady = false;
+  await checkRouteTypeToggleRequest();
+  await getDeparturesForStops(app.locals.routeStops, app.locals.uniqueStops, true);
+}
 
-  // Check for a requested change in route type
+// Check for a requested change in route type
+async function checkRouteTypeToggleRequest() {
   if (toggleRouteType) {
     console.log("Reinitialising with new route type");
     toggleRouteType = false;
-    // Toggle Route Type
-    ROUTE_TYPE = 1 - ROUTE_TYPE;
+    ROUTE_TYPE = 1 - ROUTE_TYPE; // Toggle Route Type
     // Clear the existing data
     app.locals.routeStops = [];
     app.locals.uniqueStops = [];
     app.locals.stationDepartures = [];
     await initiate();
-    setInterval(repetition, apiDemandThreshold);
+    setInterval(repetition, apiDemandThreshold); // TODO: SET THE CORRECT API THRESHOLD
   }
-
-  if (app.locals.routeStops) {
-    console.time("repetition");
-    let departures = [];
-    let stops = app.locals.routeStops;
-
-    API.getDepartures(routes, ROUTE_TYPE, app.locals.uniqueStops)
-        .then(response => {
-          let routeDepartures = response.routeDepartures;
-          let stationDepartures = response.stationDepartures;
-
-          // Update departures stored in Express
-          app.locals.stationDepartures = stationDepartures;
-
-          let uniqueRunIDs;
-          let filteredRuns;
-          let runs = [];
-
-          // Get depatures for every unique runID
-          for (let k in routeDepartures) {
-            routeID = routeDepartures[k].routeID;
-            uniqueRunIDs = Departures.getUniqueRuns(routeDepartures[k].departures);
-            filteredRuns = Departures.getDeparturesForRuns(uniqueRunIDs, routeDepartures[k].departures);
-
-            // Find array of departures for routeID
-            let routeIDStops;
-            for (let l in stops) {
-              if (stops[l].routeID === routeID) {
-                routeIDStops = stops[l].routeStops;
-                break;
-              }
-            }
-
-            for (let l in filteredRuns) {
-              console.log("RunID " + filteredRuns[l].run_id + ", Num departures: " + filteredRuns[l].departures.length);
-
-              let target = new Set();
-              let valid = 0;
-
-              // Determine all stopIDs covered by all of a given runID departures
-              for (let m in filteredRuns[l].departures) {
-                target.add(filteredRuns[l].departures[m].stop_id);
-              }
-
-              // Determine if any of the runID stops match up with routeID Stops
-              for (let m in routeIDStops) {
-                if (target.has(routeIDStops[m].stop_id)) {
-                  valid++;
-                }
-              }
-
-              // Require that runID stops are entirely in routeID stops
-              if (valid === target.size) {
-                runs.push({
-                  departure: filteredRuns[l].departures,
-                  coordinates: Stations.getCoordinatesPair(routeIDStops, filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-                });
-              }
-            }
-          }
-          const data = {
-            runs: runs
-          };
-          app.locals.data = data;
-
-          console.log("Updated...");
-          console.log(data.runs.length);
-          console.timeEnd("repetition");
-          repetitionReady = true;
-        });
-  }
-};
+}
 
 initiate();
-var refresh = setInterval(repetition, ptvAPIRepFreq);
+let refresh = setInterval(repetition, ptvAPIRepFreq);
 
 // TODO: Cleanup
 // Cyclic dependency with index.js, module.exports must be called before requiring index.js.
