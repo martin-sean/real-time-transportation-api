@@ -87,13 +87,14 @@ async function initiate() {
       .then(result => {
         routes = result; // Save the routes in the instance variable
         let stops = [];
+        let stopIDs = new Set();
         let uniqueStops = [];
         // For each route, get the stops and directions
         for (let route in routes) {
           const route_id = routes[route].route_id;
           console.log("ROUTE ID = " + route_id + " (" + routes[route].route_name + ")");
           getDirectionsForRoute(route, route_id);
-          getStopsForRoute(route_id, stops, uniqueStops);
+          getStopsForRoute(route_id, stops, uniqueStops, stopIDs);
         }
       });
 };
@@ -121,8 +122,9 @@ async function getDirectionsForRoute(route, route_id) {
  * @param route_id      id of the route to get stops for
  * @param stops         collection of stops to get departures for
  * @param uniqueStops   collection of unique stops
+ * @param stopIDs       set of stopIDs for identifying unique stops
  */
-async function getStopsForRoute(route_id, stops, uniqueStops) {
+async function getStopsForRoute(route_id, stops, uniqueStops, stopIDs) {
   API.getStops(route_id, ROUTE_TYPE)
       .then(routeStops => {
         let index; // Index of unused station
@@ -135,7 +137,6 @@ async function getStopsForRoute(route_id, stops, uniqueStops) {
             index = stop;
           }
           // Build a list of distinct stops
-          let stopIDs = new Set();
           if (!stopIDs.has(stopID)) {
             stopIDs.add(stopID);
             uniqueStops.push({
