@@ -186,7 +186,7 @@ async function getDeparturesForStops(stops, uniqueStops, repetition) {
         let runs = [];
 
         // Storing the data in express
-        if (repetition) {
+        if (!repetition) {
           app.locals.routeStops = stops;
           app.locals.uniqueStops = uniqueStops;
         }
@@ -259,7 +259,7 @@ async function repetition() {
   repetitionReady = false;
   await checkRouteTypeToggleRequest();
   await getDeparturesForStops(app.locals.routeStops, app.locals.uniqueStops, true);
-}
+};
 
 // Check for a requested change in route type
 async function checkRouteTypeToggleRequest() {
