@@ -88,7 +88,7 @@ async function initiate() {
   console.time("initiate");
   repetitionReady = false;
   // Get all routes for a given route type (Train/Tram)
-  API.getRoutes(ROUTE_TYPE)
+  await API.getRoutes(ROUTE_TYPE)
       .then(result => {
         routes = result; // Save the routes in the instance variable
         let stops = [];
@@ -138,14 +138,15 @@ async function getStopsForRoute(route_id, stops) {
           // Detect unused stations
           if (stopID === FLEMINGTON_RC) {
             index = stop;
+          } else {
+            // Keep track of unique stops
+            uniqueStops.set(stopID, {
+              stop_id: stopID,
+              stop_name: routeStops[stop].stop_name,
+              stop_latitude: routeStops[stop].stop_latitude,
+              stop_longitude: routeStops[stop].stop_longitude
+            });
           }
-          // Keep track of unique stops
-          uniqueStops.set(stopID, {
-            stop_id: stopID,
-            stop_name: routeStops[stop].stop_name,
-            stop_latitude: routeStops[stop].stop_latitude,
-            stop_longitude: routeStops[stop].stop_longitude
-          });
         } // end of for each loop
 
         // Remove unused stations
@@ -175,8 +176,9 @@ async function getStopsForRoute(route_id, stops) {
         // Get all departures for each unique stop when all stops are retrieved
         if (stops.length === routes.length) {
           // Store route descriptions
+          app.locals.routeStops = stops;
           app.locals.routes = routes;
-          getDeparturesForStops(stops, false)
+          getDeparturesForStops(stops);
         }
       })
 }
@@ -187,7 +189,7 @@ async function getStopsForRoute(route_id, stops) {
  * @param stops           collection of stops in a route
  */
 async function getDeparturesForStops(stops) {
-  API.getDepartures(routes, ROUTE_TYPE, uniqueStops)
+  await API.getDepartures(routes, ROUTE_TYPE, uniqueStops)
       .then(response => {
         let routeDepartures = response.routeDepartures;
         let stationDepartures = response.stationDepartures;
@@ -195,7 +197,6 @@ async function getDeparturesForStops(stops) {
         let filteredRuns;
         let runs = [];
 
-        app.locals.routeStops = stops;
         app.locals.stationDepartures = stationDepartures;
 
         // Get departures for every unique runID
@@ -224,12 +225,21 @@ async function getDeparturesForStops(stops) {
  * @param stops           collection of stops in a route
  */
 async function getDeparturesForRunIDs() {
-  API.getDeparturesForRunIDs(uniqueRunIDs, ROUTE_TYPE, uniqueStops)
+  let removeRunIDs;
+  await API.getDeparturesForRunIDs(uniqueRunIDs, ROUTE_TYPE, uniqueStops)
     .then(response => {
       app.locals.stationDepartures = response.stationDepartures;
       let filteredRuns = response.runDepartures;
       let stops = app.locals.routeStops;
       let runs = [];
+      removeRunIDs = response.removeRunIDs;
+
+      // Remove runIDs that no longer have any present departures
+      console.log("Removing " + removeRunIDs.size + " RunIDs:");
+      for(let oldRunID of removeRunIDs) {
+        console.log("\t" + oldRunID);
+        uniqueRunIDs.delete(oldRunID);
+      }
 
       getValidRuns(runs, filteredRuns, stops);
 
@@ -238,9 +248,10 @@ async function getDeparturesForRunIDs() {
       };
 
       console.log("Updated: " + app.locals.data.runs.length + " runs.");
-      console.timeEnd("repetition");
-      repetitionReady = true;
     })
+  await getNewRunIDs(removeRunIDs);
+  console.timeEnd("repetition");
+  repetitionReady = true;
 }
 
 /**
@@ -253,14 +264,12 @@ async function getDeparturesForRunIDs() {
  */
 function getValidRuns(runs, filteredRuns, stops) {
   for (let i in filteredRuns) {
-    console.log("RunID " + filteredRuns[i].run_id + ", Num departures: " + filteredRuns[i].departures.length);
-
     // Get array of departures for route ID of run
     let routeIDStops;
     for (let j in stops) {
       if (stops[j].routeID === filteredRuns[i].departures[0].route_id) {
         routeIDStops = stops[j].routeStops;
-        if (repetition) break;
+        break;
       }
     }
 
@@ -287,8 +296,40 @@ function getValidRuns(runs, filteredRuns, stops) {
                                                 filteredRuns[i].departures[0].stop_id,
                                                 filteredRuns[i].departures[0].direction_id)
       });
+    } else {
+      console.log("Invalid size");
     }
   }
+}
+
+/**
+ * Checks terminal stations for any new runIDs that appear over time
+
+ * @param oldRunIDs        Used to not add in stops that have just been removed
+ */
+async function getNewRunIDs(oldRunIDs) {
+  await API.getDepartures(routes, ROUTE_TYPE, terminalStops)
+    .then(response => {
+      console.log(oldRunIDs);
+      let stationDepartures = response.stationDepartures;
+
+      let addedRunIDs = new Set(); // This is only for logging purposes
+
+      for(let i in stationDepartures) {
+        let departures = stationDepartures[i].departures;
+        for(let j in departures) {
+          if(!uniqueRunIDs.has(departures[j].run_id) && !oldRunIDs.has(departures[j].run_id)) {
+            addedRunIDs.add(departures[j].run_id);
+            uniqueRunIDs.add(departures[j].run_id);
+          }
+        }
+      }
+
+      console.log("Adding " + addedRunIDs.size + " RunIDs:")
+      for(let i of addedRunIDs.values()) {
+        console.log("\t" + i);
+      }
+    })
 }
 
 /**
@@ -305,8 +346,6 @@ async function repetition() {
 
   await checkRouteTypeToggleRequest();
   await getDeparturesForRunIDs();
-
-  // TODO: Get new run IDs from terminal stations (terminalStops)
 };
 
 // Check for a requested change in route type
@@ -315,9 +354,11 @@ async function checkRouteTypeToggleRequest() {
     console.log("Reinitialising with new route type");
     toggleRouteType = false;
     ROUTE_TYPE = 1 - ROUTE_TYPE; // Toggle Route Type
+
     // Clear the existing data
     app.locals.routeStops = [];
     app.locals.stationDepartures = [];
+
     routes = [];
     terminalStops = new Map();
     uniqueStops = new Map();

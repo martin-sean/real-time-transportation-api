@@ -113,7 +113,13 @@ module.exports = {
             })
         return stops;
     },
-    // Retrieve all the departures for stations and routes
+    /**
+     * Retrieve all the departures for stations and routes
+     *
+     * @param routes        Array containing info about route IDs
+     * @param route_type    Route type number for use with PTV API (0 = Train, 1 = Tram)
+     * @param uniqueStops   Iterable containing stops to check over
+     */
     getDepartures: async function (routes, route_type, uniqueStops) {
         let routeIndexes = [];
         let routeDepartures = [];
@@ -168,6 +174,7 @@ module.exports = {
         let routeIndexes = [];
         let routeDepartures = [];
         let stationDepartures = [];
+        let removeRunIDs = new Set();
 
         let runDepartures = [];
         let uniqueRunIDs = Array.from(runIDSet);
@@ -195,27 +202,52 @@ module.exports = {
                     console.log(error);
                     return [];
                 });
-            if(departures != null && departures.length > 0) {
-                let runIDDepartures = {
-                    run_id: run_id,
-                    departures: departures
-                };
-                console.log("(" + i + "/" + uniqueRunIDs.length +
-                            ") Updating RunID " + run_id + ")");
-                runDepartures.push(runIDDepartures);
 
-                // Append departures from a runID to associated station departure array
-                for(let j in runIDDepartures.departures) {
-                    let stationIndex = getStationIndex(stationDepartures, runIDDepartures.departures[j].stop_id);
-                    if(stationIndex !== -1) {
-                        stationDepartures[stationIndex].departures.push(runIDDepartures.departures[j]);
+            if(departures != null) {
+                let validDepartures = [];
+
+                // Remove departures in the past
+                for(let j in departures) {
+                    let time;
+                    if(departures[j].estimated_departure_utc != null) {
+                        time = moment.utc(departures[j].estimated_departure_utc);
+                    } else {
+                        time = moment.utc(departures[j].scheduled_departure_utc);
+                    }
+                    if(time.diff(moment.utc(), 'minutes') >= 0) {
+                        validDepartures.push(departures[j]);
                     }
                 }
+
+                // Only add runs if they have at least 1 valid departure
+                if(validDepartures.length > 0) {
+                    let runIDDepartures = {
+                        run_id: run_id,
+                        departures: validDepartures
+                    };
+                    console.log("(" + i + "/" + uniqueRunIDs.length +
+                                ") Updating RunID " + run_id);
+                    runDepartures.push(runIDDepartures);
+
+                    // Append departures from a runID to associated station departure array
+                    for(let j in runIDDepartures.departures) {
+                        let stationIndex = getStationIndex(stationDepartures, runIDDepartures.departures[j].stop_id);
+                        if(stationIndex !== -1) {
+                            stationDepartures[stationIndex].departures.push(runIDDepartures.departures[j]);
+                        }
+                    }
+                } else {
+                    removeRunIDs.add(run_id);
+                }
+            } else {
+                removeRunIDs.add(run_id);
             }
         }
+
         return {
             runDepartures: runDepartures,
-            stationDepartures: stationDepartures
+            stationDepartures: stationDepartures,
+            removeRunIDs: removeRunIDs
         };
     },
     // Get routes for a given transportation type.
