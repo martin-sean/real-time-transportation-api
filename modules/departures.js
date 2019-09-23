@@ -29,7 +29,7 @@ function compareDeparturesTime(a, b) {
 
 module.exports = {
     // Obtaining the unique run ids from departures
-    getUniqueRuns: function (departures) {
+    getUniqueRuns: function (departures, uniqueRunIDs) {
         let runIDs = new Set();
 
         for (let i in departures) {
@@ -39,8 +39,9 @@ module.exports = {
         return Array.from(runIDs);
     },
     // Retrieving the departures for each unique runs to create a dictionary of run -> list of departures
-    getDeparturesForRuns: function (uniqueRunIDs, departures) {
+    getDeparturesForRuns: function (runIDSet, departures) {
         let filteredRuns = [];
+        let uniqueRunIDs = Array.from(runIDSet);
 
         for (let i in uniqueRunIDs) {
             let runID = uniqueRunIDs[i];
@@ -64,7 +65,6 @@ module.exports = {
 
                 filteredRuns.push({
                     run_id: runID,
-                    direction_id: direction_id,
                     departures: runIDDepartures
                 });
             }

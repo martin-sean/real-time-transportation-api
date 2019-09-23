@@ -39,9 +39,36 @@ function getRouteIndex(route, route_id) {
     return result;
 }
 
+// Used to determine where a stop ID is inside of the stops array
+function getStationIndex(stops, stop_id) {
+    let result = -1;
+    for(let i in stops) {
+        if(stops[i].stop_id === stop_id) {
+            return i;
+        }
+    }
+    return result;
+}
+
 // Call to PTV API to get all departures for a specific stop
 async function getDeparturesForStop(stop_id, route_type) {
     const request = '/v3/departures/route_type/' + route_type + '/stop/' + stop_id + '?look_backwards=false&max_results=1&devid=' + devID;
+    const signature = encryptSignature(request);
+
+    const departures = await axios.get(baseURL + request + '&signature=' + signature)
+        .then(response => {
+            return response.data.departures;
+        })
+        .catch(error => {
+            console.log(error);
+            return [];
+        })
+    return departures;
+}
+
+// Call to PTV API to get all departures for a specific run ID
+async function getDeparturesForRun(run_id, route_type) {
+    const request = '/v3/pattern/run/' + run_id + '/route_type/' + route_type + '?expand=stop&devid=' + devID;
     const signature = encryptSignature(request);
 
     const departures = await axios.get(baseURL + request + '&signature=' + signature)
@@ -91,6 +118,7 @@ module.exports = {
         let routeIndexes = [];
         let routeDepartures = [];
         let stationDepartures = [];
+        let counter = 0;
 
         // Set up array of departures for each route ID
         for(let i in routes) {
@@ -100,16 +128,15 @@ module.exports = {
             })
         }
 
-        for (let i in uniqueStops) {
-            const stop_id = uniqueStops[i].stop_id;
-
+        for (let stop of uniqueStops.values()) {
+            counter++;
             // Get all departures for a station
             let stopDepartures = {
-                stop_id: stop_id,
-                stop_name: uniqueStops[i].stop_name,
-                stop_latitude: uniqueStops[i].stop_latitude,
-                stop_longitude: uniqueStops[i].stop_longitude,
-                departures: await getDeparturesForStop(stop_id, route_type)
+                stop_id: stop.stop_id,
+                stop_name: stop.stop_name,
+                stop_latitude: stop.stop_latitude,
+                stop_longitude: stop.stop_longitude,
+                departures: await getDeparturesForStop(stop.stop_id, route_type)
                 .then(response => {
                     return response;
                 })
@@ -118,7 +145,7 @@ module.exports = {
                     return [];
                 })
             };
-            console.log("(" + i + "/" + uniqueStops.length +
+            console.log("(" + counter + "/" + uniqueStops.size +
                         ") Updating " + stopDepartures.stop_name +
                         " (ID = " + stopDepartures.stop_id +")");
             stationDepartures.push(stopDepartures);
@@ -133,6 +160,61 @@ module.exports = {
         }
         return {
             routeDepartures: routeDepartures,
+            stationDepartures: stationDepartures
+        };
+    },
+    // Retrieve all the departures for stations and routes
+    getDeparturesForRunIDs: async function (runIDSet, route_type, uniqueStops) {
+        let routeIndexes = [];
+        let routeDepartures = [];
+        let stationDepartures = [];
+
+        let runDepartures = [];
+        let uniqueRunIDs = Array.from(runIDSet);
+
+        // Set up array of departures for each route ID
+        for(let stop of uniqueStops.values()) {
+            stationDepartures.push({
+                stop_id: stop.stop_id,
+                stop_name: stop.stop_name,
+                stop_latitude: stop.stop_latitude,
+                stop_longitude: stop.stop_longitude,
+                departures: []
+            })
+        }
+
+        for (let i in uniqueRunIDs) {
+            const run_id = uniqueRunIDs[i];
+
+            // Get all departures for a station
+            let departures = await getDeparturesForRun(run_id, route_type)
+                .then(response => {
+                    return response;
+                })
+                .catch(error => {
+                    console.log(error);
+                    return [];
+                });
+            if(departures != null && departures.length > 0) {
+                let runIDDepartures = {
+                    run_id: run_id,
+                    departures: departures
+                };
+                console.log("(" + i + "/" + uniqueRunIDs.length +
+                            ") Updating RunID " + run_id + ")");
+                runDepartures.push(runIDDepartures);
+
+                // Append departures from a runID to associated station departure array
+                for(let j in runIDDepartures.departures) {
+                    let stationIndex = getStationIndex(stationDepartures, runIDDepartures.departures[j].stop_id);
+                    if(stationIndex !== -1) {
+                        stationDepartures[stationIndex].departures.push(runIDDepartures.departures[j]);
+                    }
+                }
+            }
+        }
+        return {
+            runDepartures: runDepartures,
             stationDepartures: stationDepartures
         };
     },
