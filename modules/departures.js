@@ -65,6 +65,7 @@ module.exports = {
 
                 filteredRuns.push({
                     run_id: runID,
+                    currentDeparture: 0,
                     departures: runIDDepartures
                 });
             }

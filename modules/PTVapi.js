@@ -205,6 +205,7 @@ module.exports = {
 
             if(departures != null) {
                 let validDepartures = [];
+                let currentDeparture = -1;
 
                 // Remove departures in the past
                 for(let j in departures) {
@@ -215,15 +216,18 @@ module.exports = {
                         time = moment.utc(departures[j].scheduled_departure_utc);
                     }
                     if(time.diff(moment.utc(), 'minutes') >= 0) {
-                        validDepartures.push(departures[j]);
+                        // validDepartures.push(departures[j]);
+                        currentDeparture = j;
+                        break;
                     }
                 }
 
                 // Only add runs if they have at least 1 valid departure
-                if(validDepartures.length > 0) {
+                if(currentDeparture >= 0) {
                     let runIDDepartures = {
                         run_id: run_id,
-                        departures: validDepartures
+                        departures: departures,
+                        currentDeparture: currentDeparture
                     };
                     console.log("(" + i + "/" + uniqueRunIDs.length +
                                 ") Updating RunID " + run_id);
@@ -232,7 +236,7 @@ module.exports = {
                     // Append departures from a runID to associated station departure array
                     for(let j in runIDDepartures.departures) {
                         let stationIndex = getStationIndex(stationDepartures, runIDDepartures.departures[j].stop_id);
-                        if(stationIndex !== -1) {
+                        if(stationIndex !== -1 && j >= currentDeparture) {
                             stationDepartures[stationIndex].departures.push(runIDDepartures.departures[j]);
                         }
                     }

@@ -292,9 +292,10 @@ function getValidRuns(runs, filteredRuns, stops) {
     if (valid === target.size) {
       runs.push({
         departure: filteredRuns[i].departures,
+        currentDeparture: filteredRuns[i].currentDeparture,
         coordinates: Stations.getCoordinatesPair(routeIDStops,
-                                                filteredRuns[i].departures[0].stop_id,
-                                                filteredRuns[i].departures[0].direction_id)
+                                                filteredRuns[i].departures[filteredRuns[i].currentDeparture].stop_id,
+                                                filteredRuns[i].departures[filteredRuns[i].currentDeparture].direction_id)
       });
     } else {
       console.log("Invalid size");
