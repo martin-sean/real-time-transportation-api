@@ -130,6 +130,7 @@ module.exports = {
         for(let i in routes) {
             routeDepartures.push({
                 routeID: routes[i].route_id,
+                currentDeparture: 0,
                 departures: []
             })
         }
