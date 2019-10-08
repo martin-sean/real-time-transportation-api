@@ -1,39 +1,60 @@
-module.exports = {
-    // Get coordinates of the stops that the train is currently in between
-    getCoordinatesPair: function (stops, stop_id, direction_id) {
-        let stopsArray;
-        let previousStopCoordinates;
-        let nextStopCoordinates;
-        let previousStopID;
-        let valid = false;
+function getNextPrevStopID(routeStops, run) {
+    let stopsArray;
+    let prevStopID;
+    let nextStopID;
+    let direction_id = run.departures[run.currentDeparture].direction_id;
 
-        // Scenario when next stop is not the last stop
-        if (direction_id === 1) {   // all direction_id 1 goes to City (Flinders Street)
-            stopsArray = stops
-        } else {                    // any other direction_id is going away from City
-            stopsArray = stops.slice().reverse();
-        }
+    // Scenario when next stop is not the last stop
+    if (direction_id === 1) {   // all direction_id 1 goes to City (Flinders Street)
+        stopsArray = routeStops
+    } else {                    // any other direction_id is going away from City
+        stopsArray = routeStops.slice().reverse();
+    }
 
+    if(run.currentDeparture > 0) {
+        // Run departures are known
+        prevStopID = run.departures[run.currentDeparture - 1].stop_id;
+        nextStopID = run.departures[run.currentDeparture].stop_id;
+    } else {
+        // Infer stops based on route pattern
+        let stop_id = run.departures[run.currentDeparture].stop_id;
         for (let i in stopsArray) {
             if (stopsArray[i].stop_id === stop_id) {
                 if (i > 0) {
-                    previousStopID = stopsArray[parseInt(i) - 1].stop_id;
-                    previousStopCoordinates = [stopsArray[parseInt(i) - 1].stop_latitude, stopsArray[parseInt(i) - 1].stop_longitude];
-                    nextStopCoordinates = [stopsArray[i].stop_latitude, stopsArray[i].stop_longitude];
-                    nextStopID = stopsArray[parseInt(i)].stop_id;
+                    prevStopID = stopsArray[i - 1].stop_id;
+                    nextStopID = stopsArray[i].stop_id;
                 } else {
-                    nextStopCoordinates = [stopsArray[i].stop_latitude, stopsArray[i].stop_longitude];
-                    nextStopID = stopsArray[parseInt(i)].stop_id;
+                    nextStopID = stopsArray[i].stop_id;
                 }
-                valid = true;
             }
         }
+    }
+
+    return {
+        prevStopID: prevStopID,
+        nextStopID: nextStopID
+    }
+}
+
+module.exports = {
+    // Get coordinates of the stops that the train is currently in between
+    getCoordinatesPair: function (routeStops, uniqueStops, run) {
+        let nextPrevStopIDs = getNextPrevStopID(routeStops, run);
+        let prevStopID = nextPrevStopIDs.prevStopID;
+        let nextStopID = nextPrevStopIDs.nextStopID;
+
+        let previousStopCoordinates;
+        if(prevStopID) {
+            previousStopCoordinates = [uniqueStops.get(prevStopID).stop_latitude, uniqueStops.get(prevStopID).stop_longitude];
+        }
+        let nextStopCoordinates = [uniqueStops.get(nextStopID).stop_latitude, uniqueStops.get(nextStopID).stop_longitude];
+
         return {
             previousStopCoordinates: previousStopCoordinates,
             nextStopCoordinates: nextStopCoordinates,
-            previousStopID: previousStopID,
+            prevStopID: prevStopID,
             nextStopID: nextStopID,
-            direction_id: direction_id
+            direction_id: run.departures[run.currentDeparture].direction_id
         }
     },
     // Get coordinates of the stop when the train is at platform
@@ -46,8 +67,5 @@ module.exports = {
                 return coordinates;
             }
         }
-    },
-    getDuration: function (previousStopID, nextStopID) {
-
     }
 }

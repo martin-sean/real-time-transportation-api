@@ -293,9 +293,7 @@ function getValidRuns(runs, filteredRuns, stops) {
       runs.push({
         departure: filteredRuns[i].departures,
         currentDeparture: filteredRuns[i].currentDeparture,
-        coordinates: Stations.getCoordinatesPair(routeIDStops,
-                                                filteredRuns[i].departures[filteredRuns[i].currentDeparture].stop_id,
-                                                filteredRuns[i].departures[filteredRuns[i].currentDeparture].direction_id)
+        coordinates: Stations.getCoordinatesPair(routeIDStops, uniqueStops, filteredRuns[i])
       });
     } else {
       console.log("Invalid size");
@@ -311,7 +309,6 @@ function getValidRuns(runs, filteredRuns, stops) {
 async function getNewRunIDs(oldRunIDs) {
   await API.getDepartures(routes, ROUTE_TYPE, terminalStops)
     .then(response => {
-      console.log(oldRunIDs);
       let stationDepartures = response.stationDepartures;
 
       let addedRunIDs = new Set(); // This is only for logging purposes
