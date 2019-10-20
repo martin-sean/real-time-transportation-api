@@ -29,52 +29,46 @@ function compareDeparturesTime(a, b) {
 
 module.exports = {
     // Obtaining the unique run ids from departures
-    getUniqueRuns: function (departures, route_id) {
-        let runs = [];
+    getUniqueRuns: function (departures, uniqueRunIDs) {
+        let runIDs = new Set();
 
         for (let i in departures) {
-            for (let j in departures[i]) {
-                if (runs.indexOf(departures[i][j].run_id) === -1 && departures[i][j].route_id === route_id) {
-                    runs.push(departures[i][j].run_id);
-                }
-            }
+            runIDs.add(departures[i].run_id);
         }
 
-        return runs;
+        return Array.from(runIDs);
     },
     // Retrieving the departures for each unique runs to create a dictionary of run -> list of departures
-    getDeparturesForRuns: function (runs, departures) {
+    getDeparturesForRuns: function (runIDSet, departures) {
         let filteredRuns = [];
-        let run_id;
+        let uniqueRunIDs = Array.from(runIDSet);
 
-        for (let a in runs) {
-            run_id = runs[a];
-            let filteredDepartures = [];
+        for (let i in uniqueRunIDs) {
+            let runID = uniqueRunIDs[i];
+            let runIDDepartures = [];
             let direction_id;
 
-            for (let i in departures) {
-                for (let j in departures[i]) {
-                    if (departures[i][j].run_id === run_id) {
-                        filteredDepartures.push(departures[i][j]);
+            // Get all departures for a given runID
+            for (let j in departures) {
+                if (departures[j].run_id === runID) {
+                    runIDDepartures.push(departures[j]);
 
-                        if (!direction_id) {
-                            direction_id = departures[i][j].direction_id;
-                        }
+                    if (!direction_id) {
+                        direction_id = departures[j].direction_id;
                     }
                 }
             }
 
-            if (filteredDepartures.length > 0) {
-                filteredDepartures.sort(compareDeparturesTime);
+            // Store the array of departures for a runID
+            if (runIDDepartures.length > 0) {
+                runIDDepartures.sort(compareDeparturesTime);
 
                 filteredRuns.push({
-                    run_id: run_id,
-                    direction_id: direction_id,
-                    departures: filteredDepartures
+                    run_id: runID,
+                    currentDeparture: 0,
+                    departures: runIDDepartures
                 });
-
             }
-
         }
 
         return filteredRuns;

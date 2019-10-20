@@ -1,27 +1,46 @@
 // Load environment variables
 require('dotenv').config();
 
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
-
-// Router to handle requests
-var indexRouter = require('./routes/index');
+const createError = require('http-errors');
+const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
 
 // Self-defined modules
-var API = require('./modules/PTVapi');
-var Stations = require('./modules/stations');
-var Departures = require('./modules/departures');
+const API = require('./modules/PTVapi');
+const Stations = require('./modules/stations');
+const Departures = require('./modules/departures');
 
-var app = express();
+const app = express();
 
-// Route_id of the train lines
-const routes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17];
+// Transport type to lookup
+// 0 = Train, 1 = Tram
+let ROUTE_TYPE = 0;
+let toggleRouteType = false;
 
-// Function defined for sorting the array of stations ascendingly according to their route_id
-var sortStations = function (a, b) {
+// Prevent simultaneous repetitions
+let repetitionReady = false;
+
+// Unused station stop IDs
+const FLEMINGTON_RC = 1070;
+
+let routes = [];
+let terminalStops = new Map();
+let uniqueStops = new Map();
+let uniqueRunIDs = new Set();
+let refresh;
+
+const SECONDS_TO_MS = 1000;
+
+// Set default PTV API call frequency (30 seconds)
+let ptvAPIRepFreq = 30 * SECONDS_TO_MS;
+
+// Set default demand threshold since last client connected (60 seconds)
+let apiDemandThreshold = 60 * SECONDS_TO_MS;
+
+// Sort array of stations by route_id in ascending order
+const sortStations = function (a, b) {
   const aRouteID = a[0].route_id;
   const bRouteID = b[0].route_id;
 
@@ -36,10 +55,10 @@ var sortStations = function (a, b) {
   }
 
   return comparison;
-}
+};
 
-// Function defined for sorting the array of departures ascendingly according to their route_id
-var sortDepartures = function (a, b) {
+// Sort array of departures by route_id in ascending order
+const sortDepartures = function (a, b) {
   const aRouteID = a[0][0].route_id;
   const bRouteID = b[0][0].route_id;
   const aRouteIDIndex = routes.indexOf(aRouteID);
@@ -53,115 +72,318 @@ var sortDepartures = function (a, b) {
   }
 
   return comparison;
-}
+};
 
 // View engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
 
-// Function that initiates at the start of the app (process both static and dynamic data)
-var initiate = async function () {
+/**
+ * Initially populate the maps data structures
+ *
+ * @returns {Promise<void>} Not currently used
+ */
+async function initiate() {
   console.time("initiate");
-  let departures = [];
-  let stops = [];
-  let index;
-  for (let i in routes) {
-    const route_id = routes[i];
-    API.getStops(route_id)
+  repetitionReady = false;
+  // Get all routes for a given route type (Train/Tram)
+  await API.getRoutes(ROUTE_TYPE)
       .then(result => {
-        const routeStops = result;
-        for (let j in routeStops) {
-          if (routeStops[j].stop_id === 1070) {
-            index = j;
-          }
-          routeStops[j].route_id = route_id;
+        routes = result; // Save the routes in the instance variable
+        let stops = [];
+
+        // For each route, get the stops and directions
+        for (let route in routes) {
+          const route_id = routes[route].route_id;
+          console.log("ROUTE ID = " + route_id + " (" + routes[route].route_name + ")");
+          getDirectionsForRoute(route, route_id);
+          getStopsForRoute(route_id, stops);
         }
+      });
+};
+
+/**
+ * Get directions for a given route
+ *
+ * @param route       Route data from the API
+ * @param route_id    Associated id of @param route
+ */
+async function getDirectionsForRoute(route, route_id) {
+  API.getDirections(route_id)
+      .then(directions => {
+        routes[route].directions = directions;
+        console.log("Route ID " + route_id + " directions:");
+        for (let direction in routes[route].directions) {
+          console.log("\t ID: " + directions[direction].direction_id + " = " + directions[direction].direction_name);
+        }
+      });
+}
+
+/**
+ * Get the stops for a given route
+ *
+ * @param route_id      id of the route to get stops for
+ * @param stops         collection of stops to get departures for
+ * @param uniqueStops   collection of unique stops
+ */
+async function getStopsForRoute(route_id, stops) {
+  API.getStops(route_id, ROUTE_TYPE)
+      .then(routeStops => {
+        let index; // Index of unused station
+
+        // For each stop in a route
+        for (let stop in routeStops) {
+          let stopID = routeStops[stop].stop_id;
+          // Detect unused stations
+          if (stopID === FLEMINGTON_RC) {
+            index = stop;
+          } else {
+            // Keep track of unique stops
+            uniqueStops.set(stopID, {
+              stop_id: stopID,
+              stop_name: routeStops[stop].stop_name,
+              stop_latitude: routeStops[stop].stop_latitude,
+              stop_longitude: routeStops[stop].stop_longitude
+            });
+          }
+        } // end of for each loop
+
+        // Remove unused stations
         if (index) {
           routeStops.splice(index, 1);
         }
-        stops.push(routeStops);
 
-        API.getDeparturesForRoute(route_id, result)
-          .then(response => {
-            departures.push(response);
-            if (departures.length === routes.length) {
-              let uniqueRuns;
-              let filteredRuns;
-              let runs = [];
-              departures = departures.sort(sortDepartures);
-              stops = stops.sort(sortStations);
+        // Build stops collection
+        stops.push({
+          routeID: route_id,
+          routeStops: routeStops
+        });
 
-              // Storing the data in express
-              app.locals.stops = stops;
-              app.locals.departures = departures;
+        terminalStops.set(routeStops[0].stop_id, {
+          stop_id: routeStops[0].stop_id,
+          stop_name: routeStops[0].stop_name,
+          stop_latitude: routeStops[0].stop_latitude,
+          stop_longitude: routeStops[0].stop_longitude
+        });
+        terminalStops.set(routeStops[routeStops.length - 1].stop_id, {
+          stop_id: routeStops[routeStops.length - 1].stop_id,
+          stop_name: routeStops[routeStops.length - 1].stop_name,
+          stop_latitude: routeStops[routeStops.length - 1].stop_latitude,
+          stop_longitude: routeStops[routeStops.length - 1].stop_longitude
+        });
 
-              for (let k in departures) {
-                uniqueRuns = Departures.getUniqueRuns(departures[k], routes[k]);
-                filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
-                for (let l in filteredRuns) {
-                  runs.push({
-                    departure: filteredRuns[l].departures,
-                    coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-                  });
-                }
-              }
-              const data = {
-                runs: runs
-              }
-              app.locals.data = data;
-              console.log("Initialized...");
-              console.timeEnd("initiate");
-            }
-          })
+        // Get all departures for each unique stop when all stops are retrieved
+        if (stops.length === routes.length) {
+          // Store route descriptions
+          app.locals.routeStops = stops;
+          app.locals.routes = routes;
+          getDeparturesForStops(stops);
+        }
       })
-  }
 }
 
-// Function that repeats every interval to retrieve the latest dynamic data and process it
-var repetition = async function () {
-  if (app.locals.stops) {
-    console.time("repetition");
-    let departures = [];
-    stops = app.locals.stops;
-    for (let i in routes) {
-      const route_id = routes[i];
-      API.getDeparturesForRoute(route_id, app.locals.stops[i])
-        .then(response => {
-          departures.push(response);
-          if (departures.length === routes.length) {
-            let uniqueRuns;
-            let filteredRuns;
-            let runs = [];
-            departures = departures.sort(sortDepartures);
-            app.locals.departures = departures;
+/**
+ * Get the departures for all unique stops (uniqueStops)
+ *
+ * @param stops           collection of stops in a route
+ */
+async function getDeparturesForStops(stops) {
+  await API.getDepartures(routes, ROUTE_TYPE, uniqueStops)
+      .then(response => {
+        let routeDepartures = response.routeDepartures;
+        let stationDepartures = response.stationDepartures;
 
-            for (let k in departures) {
-              uniqueRuns = Departures.getUniqueRuns(departures[k], routes[k]);
-              filteredRuns = Departures.getDeparturesForRuns(uniqueRuns, departures[k]);
+        let filteredRuns;
+        let runs = [];
 
-              for (let l in filteredRuns) {
-                runs.push({
-                  departure: filteredRuns[l].departures,
-                  coordinates: Stations.getCoordinatesPair(stops[k], filteredRuns[l].departures[0].stop_id, filteredRuns[l].direction_id)
-                });
-              }
-            }
-            const data = {
-              runs: runs
-            }
-            console.log("Updated...");
-            console.log(data.runs.length);
-            app.locals.data = data;
-            console.timeEnd("repetition");
+        app.locals.stationDepartures = stationDepartures;
+
+        // Get departures for every unique runID
+        for (let k in routeDepartures) {
+          const routeID = routeDepartures[k].routeID;
+
+          for (let i in routeDepartures[k].departures) {
+              uniqueRunIDs.add(routeDepartures[k].departures[i].run_id);
           }
-        })
+          filteredRuns = Departures.getDeparturesForRuns(uniqueRunIDs, routeDepartures[k].departures);
+          getValidRuns(runs, filteredRuns, stops);
+        }
+        app.locals.data = {
+          runs: runs
+        };
+
+        console.log("Initialised: " + app.locals.data.runs.length + " runs.");
+        console.timeEnd("initiate");
+        repetitionReady = true;
+      })
+}
+
+/**
+ * Get the departures for all run IDs (uniqueRunIDs)
+ *
+ * @param stops           collection of stops in a route
+ */
+async function getDeparturesForRunIDs() {
+  let removeRunIDs;
+  await API.getDeparturesForRunIDs(uniqueRunIDs, ROUTE_TYPE, uniqueStops)
+    .then(response => {
+      app.locals.stationDepartures = response.stationDepartures;
+      let filteredRuns = response.runDepartures;
+      let stops = app.locals.routeStops;
+      let runs = [];
+      removeRunIDs = response.removeRunIDs;
+
+      // Remove runIDs that no longer have any present departures
+      console.log("Removing " + removeRunIDs.size + " RunIDs:");
+      for(let oldRunID of removeRunIDs) {
+        console.log("\t" + oldRunID);
+        uniqueRunIDs.delete(oldRunID);
+      }
+
+      getValidRuns(runs, filteredRuns, stops);
+
+      app.locals.data = {
+        runs: runs
+      };
+
+      console.log("Updated: " + app.locals.data.runs.length + " runs.");
+    })
+  await getNewRunIDs(removeRunIDs);
+  console.timeEnd("repetition");
+  repetitionReady = true;
+}
+
+/**
+ * Checks to ensure stops in runs coincide with route stops
+ * Also determines coordinates of vehicle for each run
+ *
+ * @param runs           Array to output valid runs into
+ * @param filteredRuns   Runs to validate
+ * @param stops          Stops for each route to check against
+ */
+function getValidRuns(runs, filteredRuns, stops) {
+  for (let i in filteredRuns) {
+    // Get array of departures for route ID of run
+    let routeIDStops;
+    for (let j in stops) {
+      if (stops[j].routeID === filteredRuns[i].departures[0].route_id) {
+        routeIDStops = stops[j].routeStops;
+        break;
+      }
+    }
+
+    let target = new Set();
+    let valid = 0;
+
+    // Determine all stopIDs covered by all of a given runID departures
+    for (let j in filteredRuns[i].departures) {
+      target.add(filteredRuns[i].departures[j].stop_id);
+    }
+
+    // Determine if any of the runID stops match up with routeID Stops
+    for (let j in routeIDStops) {
+      if (target.has(routeIDStops[j].stop_id)) {
+        valid++;
+      }
+    }
+
+    // Require that runID stops are entirely in routeID stops
+    if (valid === target.size) {
+      runs.push({
+        departure: filteredRuns[i].departures,
+        currentDeparture: filteredRuns[i].currentDeparture,
+        coordinates: Stations.getCoordinatesPair(routeIDStops, uniqueStops, filteredRuns[i])
+      });
+    } else {
+      console.log("Invalid size");
     }
   }
 }
 
+/**
+ * Checks terminal stations for any new runIDs that appear over time
+
+ * @param oldRunIDs        Used to not add in stops that have just been removed
+ */
+async function getNewRunIDs(oldRunIDs) {
+  await API.getDepartures(routes, ROUTE_TYPE, terminalStops)
+    .then(response => {
+      let stationDepartures = response.stationDepartures;
+
+      let addedRunIDs = new Set(); // This is only for logging purposes
+
+      for(let i in stationDepartures) {
+        let departures = stationDepartures[i].departures;
+        for(let j in departures) {
+          if(!uniqueRunIDs.has(departures[j].run_id) && !oldRunIDs.has(departures[j].run_id)) {
+            addedRunIDs.add(departures[j].run_id);
+            uniqueRunIDs.add(departures[j].run_id);
+          }
+        }
+      }
+
+      console.log("Adding " + addedRunIDs.size + " RunIDs:")
+      for(let i of addedRunIDs.values()) {
+        console.log("\t" + i);
+      }
+    })
+}
+
+/**
+ * Runs every ptvAPIRepFreq milliseconds to update the departures
+ *
+ * @returns {Promise<void>}   Not used
+ */
+async function repetition() {
+  // Return if there are no recent requests clients
+  if (!API.lastUpdate || new Date().getTime() - API.lastUpdate > apiDemandThreshold) return console.log("--No clients connected--");
+  // Return if a repetition is already running
+  if (!repetitionReady) return console.log("Repetition is already running");
+  repetitionReady = false;
+
+  await checkRouteTypeToggleRequest();
+  await getDeparturesForRunIDs();
+};
+
+// Check for a requested change in route type
+async function checkRouteTypeToggleRequest() {
+  if (toggleRouteType) {
+    console.log("Reinitialising with new route type");
+    toggleRouteType = false;
+    ROUTE_TYPE = 1 - ROUTE_TYPE; // Toggle Route Type
+
+    // Clear the existing data
+    app.locals.routeStops = [];
+    app.locals.stationDepartures = [];
+
+    routes = [];
+    terminalStops = new Map();
+    uniqueStops = new Map();
+    uniqueRunIDs = new Set();
+
+    clearInterval(refresh);
+    await initiate();
+    refresh = setInterval(repetition, apiDemandThreshold); // TODO: SET THE CORRECT API THRESHOLD
+  }
+}
+
 initiate();
-setInterval(repetition, 15000);
+refresh = setInterval(repetition, ptvAPIRepFreq);
+
+// TODO: Cleanup
+// Cyclic dependency with index.js, module.exports must be called before requiring index.js.
+// Possibly move route type into PTVapi.js instead.
+module.exports = {
+  app,
+  // Notify that the route type should be toggled at the end of the repetition
+  notifyToggleRouteType: function () {
+    toggleRouteType = true;
+  }
+};
+
+// Router to handle requests
+const indexRouter = require('./routes/index');
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -169,8 +391,35 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+
+// Forward other requests to router
 app.use('/', indexRouter);
 app.use('/api', indexRouter);
+
+// Handle requests to update refresh rate
+app.use('/refresh', function (req, res, next) {
+  if(refresh != null) {
+    if(req.body.refreshRate != null) {
+      let refreshRate = req.body.refreshRate;
+
+      res.send("Updating refresh rate to: " + refreshRate + " seconds");
+      console.log("Updating refresh rate to: " + refreshRate + " seconds");
+
+      // Reset refresh timer with new rate
+      API.notifyUpdate();
+      clearInterval(refresh);
+      ptvAPIRepFreq = refreshRate * SECONDS_TO_MS;
+      refresh = setInterval(repetition, ptvAPIRepFreq);
+
+      apiDemandThreshold = 2 * ptvAPIRepFreq;
+    } else {
+      // Return current refresh rate
+      res.json({refresh: ptvAPIRepFreq / SECONDS_TO_MS});
+    }
+  } else {
+    res.send("Wait for initialisation to finish...");
+  }
+});
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -187,5 +436,3 @@ app.use(function (err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
-
-module.exports = app;
