@@ -121,7 +121,6 @@ module.exports = {
      * @param uniqueStops   Iterable containing stops to check over
      */
     getDepartures: async function (routes, route_type, uniqueStops) {
-        let routeIndexes = [];
         let routeDepartures = [];
         let stationDepartures = [];
         let counter = 0;
@@ -172,8 +171,6 @@ module.exports = {
     },
     // Retrieve all the departures for stations and routes
     getDeparturesForRunIDs: async function (runIDSet, route_type, uniqueStops) {
-        let routeIndexes = [];
-        let routeDepartures = [];
         let stationDepartures = [];
         let removeRunIDs = new Set();
 
@@ -205,7 +202,6 @@ module.exports = {
                 });
 
             if(departures != null) {
-                let validDepartures = [];
                 let currentDeparture = -1;
 
                 // Remove departures in the past

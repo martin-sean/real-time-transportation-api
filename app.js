@@ -39,45 +39,9 @@ let ptvAPIRepFreq = 30 * SECONDS_TO_MS;
 // Set default demand threshold since last client connected (60 seconds)
 let apiDemandThreshold = 60 * SECONDS_TO_MS;
 
-// Sort array of stations by route_id in ascending order
-const sortStations = function (a, b) {
-  const aRouteID = a[0].route_id;
-  const bRouteID = b[0].route_id;
-
-  const aRouteIDIndex = routes.indexOf(aRouteID);
-  const bRouteIDIndex = routes.indexOf(bRouteID);
-
-  let comparison = 0;
-  if (aRouteIDIndex > bRouteIDIndex) {
-    comparison = 1;
-  } else if (aRouteIDIndex < bRouteIDIndex) {
-    comparison = -1;
-  }
-
-  return comparison;
-};
-
-// Sort array of departures by route_id in ascending order
-const sortDepartures = function (a, b) {
-  const aRouteID = a[0][0].route_id;
-  const bRouteID = b[0][0].route_id;
-  const aRouteIDIndex = routes.indexOf(aRouteID);
-  const bRouteIDIndex = routes.indexOf(bRouteID);
-
-  let comparison = 0;
-  if (aRouteIDIndex > bRouteIDIndex) {
-    comparison = 1;
-  } else if (aRouteIDIndex < bRouteIDIndex) {
-    comparison = -1;
-  }
-
-  return comparison;
-};
-
 // View engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
-
 
 /**
  * Initially populate the maps data structures
